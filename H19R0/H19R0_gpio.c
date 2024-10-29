@@ -141,14 +141,6 @@ BOS_Status GetPortGPIOs(uint8_t port,uint32_t *TX_Port,uint16_t *TX_Pin,uint32_t
 		*RX_Pin = USART3_RX_PIN;
 	}
 #endif
-#ifdef _Usart4
-	else if(huart == &huart4){
-		*TX_Port =(uint32_t ) USART4_TX_PORT;
-		*TX_Pin = USART4_TX_PIN;
-		*RX_Port =(uint32_t ) USART4_RX_PORT;
-		*RX_Pin = USART4_RX_PIN;
-	}
-#endif
 #ifdef _Usart5	
 	else if(huart == &huart5){
 		*TX_Port =(uint32_t ) USART5_TX_PORT;
@@ -164,24 +156,6 @@ BOS_Status GetPortGPIOs(uint8_t port,uint32_t *TX_Port,uint16_t *TX_Pin,uint32_t
 		*RX_Port =(uint32_t ) USART6_RX_PORT;
 		*RX_Pin = USART6_RX_PIN;
 	}
-#endif
-#ifdef _Usart7
-	else if (huart == &huart7) 
-	{		
-		*TX_Port = (uint32_t)USART7_TX_PORT;
-		*TX_Pin = USART7_TX_PIN;
-		*RX_Port = (uint32_t)USART7_RX_PORT;
-		*RX_Pin = USART7_RX_PIN;
-	} 
-#endif
-#ifdef _Usart8	
-	else if (huart == &huart8) 
-	{	
-		*TX_Port = (uint32_t)USART8_TX_PORT;
-		*TX_Pin = USART8_TX_PIN;
-		*RX_Port = (uint32_t)USART8_RX_PORT;
-		*RX_Pin = USART8_RX_PIN;
-	} 
 #endif
 	else
 		result =BOS_ERROR;
