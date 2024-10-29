@@ -24,10 +24,9 @@
 #define modulePN    _H19R0
 
 /* Port-related definitions */
-#define NumOfPorts    6
+#define NumOfPorts    5
 #define P_PROG        P2            /* ST factory bootloader UART */
 /* Define available ports */
-#define _P1
 #define _P2
 #define _P3
 #define _P4
@@ -38,12 +37,10 @@
 #define _Usart1 1
 #define _Usart2 1
 #define _Usart3 1
-#define _Usart4 1
 #define _Usart5 1
 #define _Usart6 1
 
 /* Port-UART mapping */
-#define P1uart &huart4
 #define P2uart &huart2
 #define P3uart &huart3
 #define P4uart &huart1
@@ -105,7 +102,6 @@ typedef enum {
 extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart3;
-extern UART_HandleTypeDef huart4;
 extern UART_HandleTypeDef huart5;
 extern UART_HandleTypeDef huart6;
 
@@ -113,7 +109,6 @@ extern UART_HandleTypeDef huart6;
 extern void MX_USART1_UART_Init(void);
 extern void MX_USART2_UART_Init(void);
 extern void MX_USART3_UART_Init(void);
-extern void MX_USART4_UART_Init(void);
 extern void MX_USART5_UART_Init(void);
 extern void MX_USART6_UART_Init(void);
 
