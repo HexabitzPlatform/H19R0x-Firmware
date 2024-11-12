@@ -30,6 +30,7 @@ int main(void) {
 void UserTask(void *argument) {
 
 	// put your code here, to run repeatedly.
+	ReceiveMessage();
 	while (1) {
 
 	}
