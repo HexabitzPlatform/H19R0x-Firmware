@@ -14,12 +14,5 @@
 
 #include"Commands_Driver_APIs.h"
 
-uint8_t TestDebuging()
-{
-	uint8_t c = 0;
-	c = c + 1;
-	c = 15;
-	return 0;
-}
 
 /************************ (C) COPYRIGHT Hexabitz *****END OF FILE****/

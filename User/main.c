@@ -30,14 +30,7 @@ int main(void) {
 void UserTask(void *argument) {
 
 	// put your code here, to run repeatedly.
-	uint8_t d = 0;
 	while (1) {
-
-		TestDebuging();
-		HAL_GPIO_WritePin(_IND_LED_PORT, _IND_LED_PIN, SET);
-		HAL_UART_Transmit(&huart1, MSG_P, 5, 1000);
-
-
 
 	}
 }

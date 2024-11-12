@@ -25,8 +25,6 @@ extern "C" {
 
 /* Exported functions  ---------------------------------------------*/
 
-uint8_t TestDebuging();
-
 
 #ifdef __cplusplus
 }
