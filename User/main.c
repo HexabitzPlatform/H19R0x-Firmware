@@ -9,7 +9,7 @@
 #include "BOS.h"
 
 /* Private variables ---------------------------------------------------------*/
-
+uint8_t MSG_P[5]="Hello";
 /* Private function prototypes -----------------------------------------------*/
 
 /* Main function ------------------------------------------------------------*/
@@ -29,7 +29,16 @@ int main(void) {
 void UserTask(void *argument) {
 
 	// put your code here, to run repeatedly.
+	uint8_t d = 0;
 	while (1) {
+
+		HAL_GPIO_WritePin(_IND_LED_PORT, _IND_LED_PIN, SET);
+		HAL_GPIO_WritePin(_IND_LED_PORT, _IND_LED_PIN, RESET);
+		HAL_GPIO_WritePin(_IND_LED_PORT, _IND_LED_PIN, SET);
+		HAL_GPIO_WritePin(_IND_LED_PORT, _IND_LED_PIN, RESET);
+		HAL_GPIO_WritePin(_IND_LED_PORT, _IND_LED_PIN, SET);
+
+
 
 	}
 }
