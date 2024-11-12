@@ -28,13 +28,11 @@ uint8_t SendCommand(uint8_t commands, float arg1, float arg2);
 uint8_t ReceiveMessage();
 uint8_t ProccessReceivedMessage(uint8_t *commands, float *arg1, float *arg2);
 
-
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	ProccessReceivedMessage(&command, &arg11, &arg12);
 	SendCommand(command, arg11, arg12);
 	HAL_UART_Receive_IT(&huart1, ReceivedMessage, 11);
 }
-
 
 /**************************************************************************/
 /* Local Functions  *******************************************************/
@@ -140,8 +138,16 @@ uint8_t ProccessReceivedMessage(uint8_t *commands, float *arg1, float *arg2) {
 /* Exported functions  ****************************************************/
 /**************************************************************************/
 
-uint8_t SetPsition()
-{
+/**
+  * @brief Programs a position command for Motor in the given @p Duration time.
+  *
+  * @param  Position Target mechanical angle reference at the end of the movement.
+  *         This value represents the final position expressed in radian.
+  * @param  Duration of the movement expressed in seconds.
+  */
+uint8_t SetPsition(float Position, float Duration) {
+
+	SendCommand(SET_POSITION, Position, Duration);
 
 	return 0;
 }
