@@ -150,6 +150,10 @@ void DMA_FRONTEND_CH_Init(DMA_HandleTypeDef *hDMA,DMA_Channel_TypeDef *ch){
 /* Setup and start Messaging DMAs 
  */
 void SetupMessagingRxDMAs(void){
+#ifdef _P1
+	if(portStatus[P1] == FREE)
+		DMA_MSG_RX_Setup(P1uart,&msgRxDMA[0]);
+#endif
 #ifdef _P2
 	if(portStatus[P2] == FREE)
 		DMA_MSG_RX_Setup(P2uart,&msgRxDMA[1]);
@@ -412,6 +416,12 @@ void RemapAndLinkDMAtoUARTRx(UART_HandleTypeDef *huart,DMA_HandleTypeDef *hDMA){
 		LL_DMAMUX_SetRequestID(&DMAMUXRx[2],LL_DMAMUX_CHANNEL_2, LL_DMAMUX_REQ_USART3_RX);
 	}
 
+	// USART 4
+	else if(huart->Instance == USART4 && hDMA->Instance == DMA1_Channel4){
+		//__HAL_DMA1_REMAP(HAL_DMA1_CH1_USART4_RX);
+		LL_DMAMUX_SetRequestID(&DMAMUXRx[3],LL_DMAMUX_CHANNEL_3, LL_DMAMUX_REQ_USART4_RX);
+	}
+
 	// USART 5
 	else if(huart->Instance == USART5 && hDMA->Instance == DMA1_Channel5){
 		//__HAL_DMA1_REMAP(HAL_DMA1_CH1_USART5_RX);
@@ -449,6 +459,12 @@ void RemapAndLinkDMAtoUARTTx(UART_HandleTypeDef *huart,DMA_HandleTypeDef *hDMA){
 	else if(huart->Instance == USART3 && hDMA->Instance == DMA1_Channel6){
 		//__HAL_DMA1_REMAP(HAL_DMA1_CH2_USART3_TX);
 		LL_DMAMUX_SetRequestID(&DMAMUXTx[2],LL_DMAMUX_CHANNEL_5, LL_DMAMUX_REQ_USART3_TX);
+	}
+
+	// USART 4
+	else if(huart->Instance == USART4 && hDMA->Instance == DMA2_Channel1){
+		//__HAL_DMA1_REMAP(HAL_DMA1_CH2_USART4_TX);
+		LL_DMAMUX_SetRequestID(&DMAMUXTx[3],LL_DMAMUX_CHANNEL_7, LL_DMAMUX_REQ_USART4_TX);
 	}
 
 	// USART 5
