@@ -30,6 +30,8 @@ void UserTask(void *argument) {
 
 	// put your code here, to run repeatedly.
 	while (1) {
+		HAL_GPIO_TogglePin(_IND_LED_PORT, _IND_LED_PIN);
+		HAL_Delay(1000);
 
 	}
 }
