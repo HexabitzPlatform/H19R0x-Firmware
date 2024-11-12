@@ -23,15 +23,16 @@
 /* Exported definitions -------------------------------------------------------*/
 #define modulePN    _H19R0
 
+/* Types of commands ----------------------------------------------------------*/
+
 /* Port-related definitions */
-#define NumOfPorts    5
+#define NumOfPorts    4
 #define P_PROG        P2            /* ST factory bootloader UART */
 /* Define available ports */
+#define _P1
 #define _P2
 #define _P3
 #define _P4
-#define _P5
-#define _P6
 
 /* Define available USARTs */
 #define _Usart1 1
@@ -41,11 +42,10 @@
 #define _Usart6 1
 
 /* Port-UART mapping */
+#define P1uart &huart6
 #define P2uart &huart2
 #define P3uart &huart3
-#define P4uart &huart1
-#define P5uart &huart5
-#define P6uart &huart6
+#define P4uart &huart5
 
 /* Port Definitions */
 #define USART1_TX_PIN   GPIO_PIN_9
@@ -102,6 +102,7 @@ typedef enum {
 extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart3;
+extern UART_HandleTypeDef huart4;
 extern UART_HandleTypeDef huart5;
 extern UART_HandleTypeDef huart6;
 
@@ -109,6 +110,7 @@ extern UART_HandleTypeDef huart6;
 extern void MX_USART1_UART_Init(void);
 extern void MX_USART2_UART_Init(void);
 extern void MX_USART3_UART_Init(void);
+extern void MX_USART4_UART_Init(void);
 extern void MX_USART5_UART_Init(void);
 extern void MX_USART6_UART_Init(void);
 
