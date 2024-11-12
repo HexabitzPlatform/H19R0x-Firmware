@@ -16,7 +16,8 @@
 #include"H19R0_uart.h"
 uint8_t SendingMessage[11];
 uint8_t var1[4], var2[4];
-uint8_t ReceivedMessage[5];
+uint8_t ReceivedMessage[11];
+uint8_t isReceivedMEG = 0;
 
 uint8_t command = 1;
 float arg11 = 5.3, arg12 = 3.6;
@@ -29,9 +30,7 @@ uint8_t ReceiveMessage();
 uint8_t ProccessReceivedMessage(uint8_t *commands, float *arg1, float *arg2);
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	ProccessReceivedMessage(&command, &arg11, &arg12);
-	SendCommand(command, arg11, arg12);
-	HAL_UART_Receive_IT(&huart1, ReceivedMessage, 11);
+	isReceivedMEG = 1;
 }
 
 /**************************************************************************/
@@ -145,11 +144,35 @@ uint8_t ProccessReceivedMessage(uint8_t *commands, float *arg1, float *arg2) {
   *         This value represents the final position expressed in radian.
   * @param  Duration of the movement expressed in seconds.
   */
-uint8_t SetPsition(float Position, float Duration) {
+uint8_t SetPosition(float Position, float Duration) {
 
 	SendCommand(SET_POSITION, Position, Duration);
 
 	return 0;
 }
+
+/**********************************************************************/
+
+/**
+ * @brief returns the current position of Motor 1.
+ *  	get position from initial position in radian
+ *   */
+uint8_t GetPosition(float* Position){
+
+	ReceiveMessage();
+	SendCommand(GET_POSITION, 0.0, 0.0);
+	while(1){
+
+		if(isReceivedMEG==1)
+		{
+			isReceivedMEG = 0;
+			break;
+		}
+	}
+	ProccessReceivedMessage(&command, Position, &arg12);
+
+	return 0;
+}
+
 
 /************************ (C) COPYRIGHT Hexabitz *****END OF FILE****/

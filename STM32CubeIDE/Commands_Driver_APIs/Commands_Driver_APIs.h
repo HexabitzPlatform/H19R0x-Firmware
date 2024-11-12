@@ -42,7 +42,8 @@ typedef enum {
 
 /* Exported functions  ---------------------------------------------*/
 
-uint8_t SetPsition(float Position, float Duration);
+uint8_t SetPosition(float Position, float Duration);
+uint8_t GetPosition(float* Position);
 
 #ifdef __cplusplus
 }
