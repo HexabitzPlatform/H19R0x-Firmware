@@ -24,15 +24,25 @@ extern "C" {
 /* Module_Status Type Definition */
 
 typedef enum {
-	START_MOTOR = 1,
-	STOP_MOTOR,
+	START_MOTOR=0,
+	STOP_MOTOR=1,
+	SET_VELOCITY,
+	SET_TORQUE,
+	SET_POSITION,
 	GET_VELOCITY,
 	GET_POSITION,
-	SET_VELOCITY,
-	SET_POSITION
+	GET_CONTROL_MODE,
+	GET_MOVE_DURATON
 } Command_Status;
+
+
+/* Exported macros -----------------------------------------------------------*/
+#define DEFAULT_VELOCITY  100u  /* default velcity is 100 rpm */
+
+
 /* Exported functions  ---------------------------------------------*/
 
+uint8_t SetPsition(float* Position, float* Duration);
 
 #ifdef __cplusplus
 }
