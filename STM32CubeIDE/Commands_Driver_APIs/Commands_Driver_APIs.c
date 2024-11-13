@@ -87,7 +87,7 @@ uint8_t PrepareMessage(uint8_t command) {
 /**********************************************************************/
 
 /**
- * @brief sending cmmand using UART1 port to stspin
+ * @brief sending command using UART1 port to stspin
  * @param1: command :  command need to be sent .
  * @param2: arg1 :  first argument in command .
  * @param3: arg2 :  second argument in command .
@@ -170,6 +170,27 @@ uint8_t GetPosition(float* Position){
 		}
 	}
 	ProccessReceivedMessage(&command, Position, &arg12);
+
+	return 0;
+}
+
+/**********************************************************************/
+
+/**
+ * @brief the total movement duration to reach the target position of Motor.
+ * * @param	Duration: pointer of duration
+ *   */
+uint8_t GetMoveDuration(float *Duration) {
+	ReceiveMessage();
+	SendCommand(GET_MOVE_DURATON, 0.0, 0.0);
+	while (1) {
+
+		if (isReceivedMEG == 1) {
+			isReceivedMEG = 0;
+			break;
+		}
+	}
+	ProccessReceivedMessage(&command, Duration, &arg12);
 
 	return 0;
 }

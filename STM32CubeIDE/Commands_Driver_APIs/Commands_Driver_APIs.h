@@ -37,13 +37,14 @@ typedef enum {
 
 
 /* Exported macros -----------------------------------------------------------*/
-#define DEFAULT_VELOCITY  100u  /* default velcity is 100 rpm */
+#define DEFAULT_VELOCITY  100u  /* default velocity is 100 rpm */
 
 
 /* Exported functions  ---------------------------------------------*/
 
 uint8_t SetPosition(float Position, float Duration);
 uint8_t GetPosition(float* Position);
+uint8_t GetMoveDuration(float* Duration);
 
 #ifdef __cplusplus
 }
