@@ -25,7 +25,7 @@ extern "C" {
 
 typedef enum {
 	START_MOTOR=0,
-	STOP_MOTOR=1,
+	STOP_MOTOR,
 	SET_VELOCITY,
 	SET_TORQUE,
 	SET_POSITION,
@@ -45,6 +45,7 @@ typedef enum {
 uint8_t SetPosition(float Position, float Duration);
 uint8_t GetPosition(float* Position);
 uint8_t GetMoveDuration(float* Duration);
+uint8_t Test_Function();
 
 #ifdef __cplusplus
 }

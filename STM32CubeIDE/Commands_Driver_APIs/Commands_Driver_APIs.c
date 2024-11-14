@@ -18,19 +18,33 @@ uint8_t SendingMessage[11];
 uint8_t var1[4], var2[4];
 uint8_t ReceivedMessage[11];
 uint8_t isReceivedMEG = 0;
+uint8_t FirstReceivedBytes[4];
+uint8_t SecondReceivedBytes[4];
 
 uint8_t command = 1;
 float arg11 = 5.3, arg12 = 3.6;
 
 /* Local Functions Definitions */
 uint8_t ConvertFloatTwoBytes(float *arg, uint8_t *fourBytes);
+uint8_t ConvertUint16TwoBytes(uint16_t *arg, uint8_t *twoBytes);
 uint8_t PrepareMessage(uint8_t command);
 uint8_t SendCommand(uint8_t commands, float arg1, float arg2);
 uint8_t ReceiveMessage();
-uint8_t ProccessReceivedMessage(uint8_t *commands, float *arg1, float *arg2);
+uint8_t ProcessReceivedCommand(uint8_t *commands);
+uint8_t ProcessReceivedFloat(uint8_t* FirstReceivedBytes, float *arg1);
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	isReceivedMEG = 1;
+//	HAL_UART_Transmit_IT(&huart1, ReceivedMessage, 6);
+	FirstReceivedBytes[0]=ReceivedMessage[3];
+	FirstReceivedBytes[1]=ReceivedMessage[4];
+	FirstReceivedBytes[2]=ReceivedMessage[5];
+	FirstReceivedBytes[3]=ReceivedMessage[6];
+
+	SecondReceivedBytes[0]=ReceivedMessage[7];
+	SecondReceivedBytes[1]=ReceivedMessage[8];
+	SecondReceivedBytes[2]=ReceivedMessage[9];
+	SecondReceivedBytes[3]=ReceivedMessage[10];
 }
 
 /**************************************************************************/
@@ -48,11 +62,44 @@ uint8_t ConvertFloatTwoBytes(float *arg, uint8_t *fourBytes) {
 	ptr = (uint8_t*) &(*arg);
 
 	for (i = 0; i < 4; i++) {
-		fourBytes[0] = (*(ptr + 0));
-		fourBytes[1] = (*(ptr + 1));
-		fourBytes[2] = (*(ptr + 2));
-		fourBytes[3] = (*(ptr + 3));
+		fourBytes[i] = (*(ptr + i));
 	}
+	return 0;
+}
+
+/**********************************************************************/
+
+/**
+ * @brief get value of two bytes in which uint16_t variable is stored
+ * @param1: *arg :  pointer of uint16_t value.
+ * @param2: *twoBytes :  pointer of four uint8_t bytes.
+ */
+uint8_t ConvertUint16TwoBytes(uint16_t *arg, uint8_t *twoBytes) {
+	uint8_t *ptr1;
+	ptr1 = (uint8_t*) &(*arg);
+
+	for (i = 0; i < 2; i++) {
+		twoBytes[i] = (*(ptr1 + i));
+	}
+
+	return 0;
+}
+
+/**********************************************************************/
+
+/**
+ * @brief get value of two bytes in which int16_t variable is stored
+ * @param1: *arg :  pointer of int16_t value.
+ * @param2: *twoBytes :  pointer of four uint8_t bytes.
+ */
+uint8_t ConvertInt16TwoBytes(int16_t *arg, uint8_t *twoBytes) {
+	uint8_t *ptr1;
+	ptr1 = (uint8_t*) &(*arg);
+
+	for (i = 0; i < 2; i++) {
+		twoBytes[i] = (*(ptr1 + i));
+	}
+
 	return 0;
 }
 
@@ -66,8 +113,9 @@ uint8_t ConvertFloatTwoBytes(float *arg, uint8_t *fourBytes) {
  * @param1: command :  command need to be sent .
  */
 uint8_t PrepareMessage(uint8_t command) {
-	SendingMessage[0] = "H";
-	SendingMessage[1] = "Z";
+
+	SendingMessage[0] = 'H';
+	SendingMessage[1] = 'Z';
 
 	SendingMessage[2] = command;
 
@@ -116,22 +164,32 @@ uint8_t ReceiveMessage() {
  * @brief processing received message from stspin
  * @param1: *command : pointer of command to which the received message is related .
  * @param2: *arg1 :  pointer of first argument in received result .
- * @param3: *arg2 :  pointer of second argument in received result .
  */
-uint8_t ProccessReceivedMessage(uint8_t *commands, float *arg1, float *arg2) {
+uint8_t ProcessReceivedCommand(uint8_t *commands) {
 	*commands = ReceivedMessage[2];
-	uint32_t temp = 0;
-	temp = ((ReceivedMessage[3] << 0) | (ReceivedMessage[4] << 8)
-			| (ReceivedMessage[5] << 16) | ReceivedMessage[6] << 24);
-	*arg1 = *((float*) &temp);
-
-	temp = ((ReceivedMessage[7] << 0) | (ReceivedMessage[8] << 8)
-			| (ReceivedMessage[9] << 16) | ReceivedMessage[10] << 24);
-	*arg2 = *((float*) &temp);
 
 	return 0;
 
 }
+
+/**********************************************************************/
+
+/**
+ * @brief processing received message from stspin
+ * @param1: *FirstReceivedBytes : pointer of Received Bytes in the received message .
+ * @param2: *arg1 :  pointer of argument in received result .
+ */
+uint8_t ProcessReceivedFloat(uint8_t* FirstReceivedBytes, float *arg1) {
+
+	uint32_t temp = 0;
+	temp = ((FirstReceivedBytes[0] << 24) | (FirstReceivedBytes[1] << 16)
+			| (FirstReceivedBytes[2] << 8) | FirstReceivedBytes[3] << 0);
+	*arg1 = *((float*) &temp);
+
+	return 0;
+
+}
+
 
 /**************************************************************************/
 /* Exported functions  ****************************************************/
@@ -160,7 +218,7 @@ uint8_t SetPosition(float Position, float Duration) {
 uint8_t GetPosition(float* Position){
 
 	ReceiveMessage();
-	SendCommand(GET_POSITION, 0.0, 0.0);
+	SendCommand(GET_POSITION, 6.0, 5.3);
 	while(1){
 
 		if(isReceivedMEG==1)
@@ -169,13 +227,23 @@ uint8_t GetPosition(float* Position){
 			break;
 		}
 	}
-	ProccessReceivedMessage(&command, Position, &arg12);
+	ProcessReceivedCommand(&command);
+	if(command==GET_POSITION)
+	{
+
+		ProcessReceivedFloat(FirstReceivedBytes, Position);
+		// only for test
+	//	HAL_UART_Transmit_IT(&huart1, FirstReceivedBytes, 4);
+		ConvertFloatTwoBytes(Position, var1);
+		ConvertFloatTwoBytes(Position, var2);
+		PrepareMessage(command);
+		HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
+	}
 
 	return 0;
 }
 
 /**********************************************************************/
-
 /**
  * @brief the total movement duration to reach the target position of Motor.
  * * @param	Duration: pointer of duration
@@ -190,8 +258,16 @@ uint8_t GetMoveDuration(float *Duration) {
 			break;
 		}
 	}
-	ProccessReceivedMessage(&command, Duration, &arg12);
+	ProcessReceivedCommand(&command);
+	if(command==GET_MOVE_DURATON)
+	{
+		ProcessReceivedFloat(FirstReceivedBytes, Duration);
+	}
 
+	return 0;
+}
+
+uint8_t Test_Function() {
 	return 0;
 }
 
