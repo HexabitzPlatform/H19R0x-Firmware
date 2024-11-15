@@ -26,10 +26,10 @@ extern "C" {
 typedef enum {
 	START_MOTOR=0,
 	STOP_MOTOR,
-	SET_VELOCITY,
+	SET_SPEED,
 	SET_TORQUE,
 	SET_POSITION,
-	GET_VELOCITY,
+	GET_SPEED,
 	GET_POSITION,
 	GET_CONTROL_MODE,
 	GET_MOVE_DURATON
@@ -44,6 +44,7 @@ typedef enum {
 
 uint8_t SetPosition(float Position, float Duration);
 uint8_t GetPosition(float* Position);
+uint8_t SetSpeed(uint16_t Time, int16_t Velocity);
 uint8_t GetMoveDuration(float* Duration);
 uint8_t Test_Function();
 

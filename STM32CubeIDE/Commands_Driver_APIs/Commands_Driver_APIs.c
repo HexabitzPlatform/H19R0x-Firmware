@@ -20,31 +20,30 @@ uint8_t ReceivedMessage[11];
 uint8_t isReceivedMEG = 0;
 uint8_t FirstReceivedBytes[4];
 uint8_t SecondReceivedBytes[4];
-
-uint8_t command = 1;
 float arg11 = 5.3, arg12 = 3.6;
 
 /* Local Functions Definitions */
-uint8_t ConvertFloatTwoBytes(float *arg, uint8_t *fourBytes);
-uint8_t ConvertUint16TwoBytes(uint16_t *arg, uint8_t *twoBytes);
+uint8_t ConvertFloatTwoBytes(float arg, uint8_t *fourBytes);
+uint8_t ConvertUint16TwoBytes(uint16_t arg, uint8_t *twoBytes);
+uint8_t ConvertInt16TwoBytes(int16_t arg, uint8_t *twoBytes);
 uint8_t PrepareMessage(uint8_t command);
 uint8_t SendCommand(uint8_t commands, float arg1, float arg2);
 uint8_t ReceiveMessage();
 uint8_t ProcessReceivedCommand(uint8_t *commands);
-uint8_t ProcessReceivedFloat(uint8_t* FirstReceivedBytes, float *arg1);
+uint8_t ProcessReceivedFloat(uint8_t *FirstReceivedBytes, float *arg1);
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	isReceivedMEG = 1;
 //	HAL_UART_Transmit_IT(&huart1, ReceivedMessage, 6);
-	FirstReceivedBytes[0]=ReceivedMessage[3];
-	FirstReceivedBytes[1]=ReceivedMessage[4];
-	FirstReceivedBytes[2]=ReceivedMessage[5];
-	FirstReceivedBytes[3]=ReceivedMessage[6];
+	FirstReceivedBytes[0] = ReceivedMessage[3];
+	FirstReceivedBytes[1] = ReceivedMessage[4];
+	FirstReceivedBytes[2] = ReceivedMessage[5];
+	FirstReceivedBytes[3] = ReceivedMessage[6];
 
-	SecondReceivedBytes[0]=ReceivedMessage[7];
-	SecondReceivedBytes[1]=ReceivedMessage[8];
-	SecondReceivedBytes[2]=ReceivedMessage[9];
-	SecondReceivedBytes[3]=ReceivedMessage[10];
+	SecondReceivedBytes[0] = ReceivedMessage[7];
+	SecondReceivedBytes[1] = ReceivedMessage[8];
+	SecondReceivedBytes[2] = ReceivedMessage[9];
+	SecondReceivedBytes[3] = ReceivedMessage[10];
 }
 
 /**************************************************************************/
@@ -56,10 +55,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
  * @param1: *arg :  pointer of float value.
  * @param2: *fourBytes :  pointer of four uint8_t bytes.
  */
-uint8_t ConvertFloatTwoBytes(float *arg, uint8_t *fourBytes) {
+uint8_t ConvertFloatTwoBytes(float arg, uint8_t *fourBytes) {
 	uint8_t *ptr, i;
 
-	ptr = (uint8_t*) &(*arg);
+	ptr = (uint8_t*) &(arg);
 
 	for (i = 0; i < 4; i++) {
 		fourBytes[i] = (*(ptr + i));
@@ -74,9 +73,9 @@ uint8_t ConvertFloatTwoBytes(float *arg, uint8_t *fourBytes) {
  * @param1: *arg :  pointer of uint16_t value.
  * @param2: *twoBytes :  pointer of four uint8_t bytes.
  */
-uint8_t ConvertUint16TwoBytes(uint16_t *arg, uint8_t *twoBytes) {
-	uint8_t *ptr1;
-	ptr1 = (uint8_t*) &(*arg);
+uint8_t ConvertUint16TwoBytes(uint16_t arg, uint8_t *twoBytes) {
+	uint8_t *ptr1, i;
+	ptr1 = (uint8_t*) &(arg);
 
 	for (i = 0; i < 2; i++) {
 		twoBytes[i] = (*(ptr1 + i));
@@ -92,9 +91,9 @@ uint8_t ConvertUint16TwoBytes(uint16_t *arg, uint8_t *twoBytes) {
  * @param1: *arg :  pointer of int16_t value.
  * @param2: *twoBytes :  pointer of four uint8_t bytes.
  */
-uint8_t ConvertInt16TwoBytes(int16_t *arg, uint8_t *twoBytes) {
-	uint8_t *ptr1;
-	ptr1 = (uint8_t*) &(*arg);
+uint8_t ConvertInt16TwoBytes(int16_t arg, uint8_t *twoBytes) {
+	uint8_t *ptr1, i;
+	ptr1 = (uint8_t*) &(arg);
 
 	for (i = 0; i < 2; i++) {
 		twoBytes[i] = (*(ptr1 + i));
@@ -135,23 +134,6 @@ uint8_t PrepareMessage(uint8_t command) {
 /**********************************************************************/
 
 /**
- * @brief sending command using UART1 port to stspin
- * @param1: command :  command need to be sent .
- * @param2: arg1 :  first argument in command .
- * @param3: arg2 :  second argument in command .
- */
-uint8_t SendCommand(uint8_t commands, float arg1, float arg2) {
-	ConvertFloatTwoBytes(&arg1, var1);
-	ConvertFloatTwoBytes(&arg2, var2);
-	PrepareMessage(commands);
-	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
-
-	return 0;
-}
-
-/**********************************************************************/
-
-/**
  * @brief start receiving message on UART1
  */
 uint8_t ReceiveMessage() {
@@ -179,7 +161,7 @@ uint8_t ProcessReceivedCommand(uint8_t *commands) {
  * @param1: *FirstReceivedBytes : pointer of Received Bytes in the received message .
  * @param2: *arg1 :  pointer of argument in received result .
  */
-uint8_t ProcessReceivedFloat(uint8_t* FirstReceivedBytes, float *arg1) {
+uint8_t ProcessReceivedFloat(uint8_t *FirstReceivedBytes, float *arg1) {
 
 	uint32_t temp = 0;
 	temp = ((FirstReceivedBytes[0] << 24) | (FirstReceivedBytes[1] << 16)
@@ -190,21 +172,23 @@ uint8_t ProcessReceivedFloat(uint8_t* FirstReceivedBytes, float *arg1) {
 
 }
 
-
 /**************************************************************************/
 /* Exported functions  ****************************************************/
 /**************************************************************************/
 
 /**
-  * @brief Programs a position command for Motor in the given @p Duration time.
-  *
-  * @param  Position Target mechanical angle reference at the end of the movement.
-  *         This value represents the final position expressed in radian.
-  * @param  Duration of the movement expressed in seconds.
-  */
+ * @brief Programs a position command for Motor in the given @p Duration time.
+ *
+ * @param  Position Target mechanical angle reference at the end of the movement.
+ *         This value represents the final position expressed in radian.
+ * @param  Duration of the movement expressed in seconds.
+ */
 uint8_t SetPosition(float Position, float Duration) {
 
-	SendCommand(SET_POSITION, Position, Duration);
+	ConvertFloatTwoBytes(Position, var1);
+	ConvertFloatTwoBytes(Duration, var2);
+	PrepareMessage(SET_POSITION);
+	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
 
 	return 0;
 }
@@ -215,32 +199,50 @@ uint8_t SetPosition(float Position, float Duration) {
  * @brief returns the current position of Motor 1.
  *  	get position from initial position in radian
  *   */
-uint8_t GetPosition(float* Position){
+uint8_t GetPosition(float *Position) {
 
 	ReceiveMessage();
-	SendCommand(GET_POSITION, 6.0, 5.3);
-	while(1){
+	PrepareMessage(GET_POSITION);
+	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
+	while (1) {
 
-		if(isReceivedMEG==1)
-		{
+		if (isReceivedMEG == 1) {
 			isReceivedMEG = 0;
 			break;
 		}
 	}
+	uint8_t command;
 	ProcessReceivedCommand(&command);
-	if(command==GET_POSITION)
-	{
+	if (command == GET_POSITION) {
 
 		ProcessReceivedFloat(FirstReceivedBytes, Position);
-		// only for test
-	//	HAL_UART_Transmit_IT(&huart1, FirstReceivedBytes, 4);
-		ConvertFloatTwoBytes(Position, var1);
-		ConvertFloatTwoBytes(Position, var2);
-		PrepareMessage(command);
-		HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
+		/*  // only for verifying results
+		 *
+		 * 	ConvertFloatTwoBytes(Position, var1);
+		 * 	ConvertFloatTwoBytes(Position, var2);
+		 * 	PrepareMessage(command);
+		 * 	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
+		 * */
+
 	}
 
 	return 0;
+}
+
+/**********************************************************************/
+/**
+ * @brief Programs a speed command for Motor in the given @p Duration Time.
+ *
+ * @param  Speed Target mechanical angle reference at the end of the movement.
+ *         This value represents the final position expressed in rpm.
+ * @param  Duration of the movement expressed in ms.
+ */
+
+uint8_t SetSpeed(uint16_t Time, int16_t Velcity) {
+	ConvertUint16TwoBytes(Time, var1);
+	ConvertInt16TwoBytes(Velcity, var2);
+	PrepareMessage(SET_SPEED);
+	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
 }
 
 /**********************************************************************/
@@ -250,7 +252,8 @@ uint8_t GetPosition(float* Position){
  *   */
 uint8_t GetMoveDuration(float *Duration) {
 	ReceiveMessage();
-	SendCommand(GET_MOVE_DURATON, 0.0, 0.0);
+	PrepareMessage(GET_MOVE_DURATON);
+	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
 	while (1) {
 
 		if (isReceivedMEG == 1) {
@@ -258,9 +261,9 @@ uint8_t GetMoveDuration(float *Duration) {
 			break;
 		}
 	}
+	uint8_t command;
 	ProcessReceivedCommand(&command);
-	if(command==GET_MOVE_DURATON)
-	{
+	if (command == GET_MOVE_DURATON) {
 		ProcessReceivedFloat(FirstReceivedBytes, Duration);
 	}
 
@@ -270,6 +273,5 @@ uint8_t GetMoveDuration(float *Duration) {
 uint8_t Test_Function() {
 	return 0;
 }
-
 
 /************************ (C) COPYRIGHT Hexabitz *****END OF FILE****/
