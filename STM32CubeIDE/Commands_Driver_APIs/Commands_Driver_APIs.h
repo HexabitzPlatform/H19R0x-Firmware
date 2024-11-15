@@ -45,6 +45,7 @@ typedef enum {
 uint8_t SetPosition(float Position, float Duration);
 uint8_t GetPosition(float* Position);
 uint8_t SetSpeed(uint16_t Time, int16_t Speed);
+uint8_t SetTorque(uint16_t Time, int16_t Torque);
 uint8_t GetMoveDuration(float* Duration);
 uint8_t Test_Function();
 

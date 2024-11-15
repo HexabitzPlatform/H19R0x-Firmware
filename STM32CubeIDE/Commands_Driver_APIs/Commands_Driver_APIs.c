@@ -248,6 +248,21 @@ uint8_t SetSpeed(uint16_t Time, int16_t Speed) {
 
 /**********************************************************************/
 /**
+ * @brief Programs a torque command for Motor in the given @p Duration Time.
+ *
+ * @param  Mechanical motor torque reference at the end of the ramp.
+  *         This value represents actually the Iq current expressed in digit.
+ * @param  Duration of the movement expressed in ms.
+ */
+uint8_t SetTorque(uint16_t Time, int16_t Torque) {
+	ConvertUint16TwoBytes(Time, FirstBytesSentMSG);
+	ConvertInt16TwoBytes(Torque, SecondBytesSentMSG);
+	PrepareMessage(SET_TORQUE);
+	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
+}
+
+/**********************************************************************/
+/**
  * @brief the total movement duration to reach the target position of Motor.
  * * @param	Duration: pointer of duration
  *   */
