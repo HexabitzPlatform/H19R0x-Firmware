@@ -286,6 +286,32 @@ uint8_t GetMoveDuration(float *Duration) {
 	return 0;
 }
 
+/**********************************************************************/
+/**
+ * @brief the total movement duration to reach the target position of Motor.
+ * * @param	Duration: pointer of duration
+ *   */
+uint8_t GetControlMode(uint8_t* Mode)
+{
+	ReceiveMessage();
+	PrepareMessage(GET_CONTROL_MODE);
+	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
+	while (1) {
+
+		if (isReceivedMEG == 1) {
+			isReceivedMEG = 0;
+			break;
+		}
+	}
+	uint8_t command;
+	ProcessReceivedCommand(&command);
+	if (command == GET_CONTROL_MODE) {
+		*Mode = FirstBytesRevdMSG[0];
+	}
+
+	return 0;
+}
+
 uint8_t Test_Function() {
 	return 0;
 }
