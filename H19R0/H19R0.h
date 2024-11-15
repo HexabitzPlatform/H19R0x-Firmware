@@ -129,6 +129,15 @@ extern void MX_USART6_UART_Init(void);
  */
 uint8_t SetPositionMotor(float Position, float Duration);
 
+
+/**********************************************************************/
+
+/**
+ * @brief returns the current position of Motor 1.
+ *  	get position from initial position in radian
+ *   */
+uint8_t GetPositionMotor(float *Position);
+
 /* -----------------------------------------------------------------------
  |                             Commands                                  |
  -----------------------------------------------------------------------

@@ -414,6 +414,14 @@ uint8_t SetPositionMotor(float Position, float Duration) {
 }
 
 
+uint8_t GetPositionMotor(float *Position){
+	GetPosition(Position);
+
+	return 0;
+}
+
+
+
 /* -----------------------------------------------------------------------
  |                             Commands                                  |
  -----------------------------------------------------------------------
