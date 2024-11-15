@@ -15,12 +15,11 @@
 #include"Commands_Driver_APIs.h"
 #include"H19R0_uart.h"
 uint8_t SendingMessage[11];
-uint8_t var1[4], var2[4];
+uint8_t FirstBytesSentMSG[4], SecondBytesSentMSG[4];
 uint8_t ReceivedMessage[11];
 uint8_t isReceivedMEG = 0;
-uint8_t FirstReceivedBytes[4];
-uint8_t SecondReceivedBytes[4];
-float arg11 = 5.3, arg12 = 3.6;
+uint8_t FirstBytesRevdMSG[4];
+uint8_t SecondBytesRevdMSG[4];
 
 /* Local Functions Definitions */
 uint8_t ConvertFloatTwoBytes(float arg, uint8_t *fourBytes);
@@ -30,20 +29,20 @@ uint8_t PrepareMessage(uint8_t command);
 uint8_t SendCommand(uint8_t commands, float arg1, float arg2);
 uint8_t ReceiveMessage();
 uint8_t ProcessReceivedCommand(uint8_t *commands);
-uint8_t ProcessReceivedFloat(uint8_t *FirstReceivedBytes, float *arg1);
+uint8_t ProcessReceivedFloat(uint8_t *ReceivedBytes, float *arg1);
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	isReceivedMEG = 1;
 //	HAL_UART_Transmit_IT(&huart1, ReceivedMessage, 6);
-	FirstReceivedBytes[0] = ReceivedMessage[3];
-	FirstReceivedBytes[1] = ReceivedMessage[4];
-	FirstReceivedBytes[2] = ReceivedMessage[5];
-	FirstReceivedBytes[3] = ReceivedMessage[6];
+	FirstBytesRevdMSG[0] = ReceivedMessage[3];
+	FirstBytesRevdMSG[1] = ReceivedMessage[4];
+	FirstBytesRevdMSG[2] = ReceivedMessage[5];
+	FirstBytesRevdMSG[3] = ReceivedMessage[6];
 
-	SecondReceivedBytes[0] = ReceivedMessage[7];
-	SecondReceivedBytes[1] = ReceivedMessage[8];
-	SecondReceivedBytes[2] = ReceivedMessage[9];
-	SecondReceivedBytes[3] = ReceivedMessage[10];
+	SecondBytesRevdMSG[0] = ReceivedMessage[7];
+	SecondBytesRevdMSG[1] = ReceivedMessage[8];
+	SecondBytesRevdMSG[2] = ReceivedMessage[9];
+	SecondBytesRevdMSG[3] = ReceivedMessage[10];
 }
 
 /**************************************************************************/
@@ -59,7 +58,7 @@ uint8_t ConvertFloatTwoBytes(float arg, uint8_t *fourBytes) {
 	uint8_t *ptr, i;
 
 	ptr = (uint8_t*) &(arg);
-
+	/* casting float variable into four bytes */
 	for (i = 0; i < 4; i++) {
 		fourBytes[i] = (*(ptr + i));
 	}
@@ -76,7 +75,7 @@ uint8_t ConvertFloatTwoBytes(float arg, uint8_t *fourBytes) {
 uint8_t ConvertUint16TwoBytes(uint16_t arg, uint8_t *twoBytes) {
 	uint8_t *ptr1, i;
 	ptr1 = (uint8_t*) &(arg);
-
+	/* casting uint16_t variable into two bytes */
 	for (i = 0; i < 2; i++) {
 		twoBytes[i] = (*(ptr1 + i));
 	}
@@ -94,7 +93,7 @@ uint8_t ConvertUint16TwoBytes(uint16_t arg, uint8_t *twoBytes) {
 uint8_t ConvertInt16TwoBytes(int16_t arg, uint8_t *twoBytes) {
 	uint8_t *ptr1, i;
 	ptr1 = (uint8_t*) &(arg);
-
+	/* casting int16_t variable into two bytes */
 	for (i = 0; i < 2; i++) {
 		twoBytes[i] = (*(ptr1 + i));
 	}
@@ -118,15 +117,15 @@ uint8_t PrepareMessage(uint8_t command) {
 
 	SendingMessage[2] = command;
 
-	SendingMessage[3] = var1[0];
-	SendingMessage[4] = var1[1];
-	SendingMessage[5] = var1[2];
-	SendingMessage[6] = var1[3];
+	SendingMessage[3] = FirstBytesSentMSG[0];  // LS
+	SendingMessage[4] = FirstBytesSentMSG[1];
+	SendingMessage[5] = FirstBytesSentMSG[2];
+	SendingMessage[6] = FirstBytesSentMSG[3];
 
-	SendingMessage[7] = var2[0];
-	SendingMessage[8] = var2[1];
-	SendingMessage[9] = var2[2];
-	SendingMessage[10] = var2[3];
+	SendingMessage[7] = SecondBytesSentMSG[0];
+	SendingMessage[8] = SecondBytesSentMSG[1];
+	SendingMessage[9] = SecondBytesSentMSG[2];
+	SendingMessage[10] = SecondBytesSentMSG[3];
 
 	return 0;
 }
@@ -158,14 +157,15 @@ uint8_t ProcessReceivedCommand(uint8_t *commands) {
 
 /**
  * @brief processing received message from stspin
- * @param1: *FirstReceivedBytes : pointer of Received Bytes in the received message .
+ * @param1: *ReceivedBytes : pointer of Received Bytes in the received message .
  * @param2: *arg1 :  pointer of argument in received result .
  */
-uint8_t ProcessReceivedFloat(uint8_t *FirstReceivedBytes, float *arg1) {
+uint8_t ProcessReceivedFloat(uint8_t *ReceivedBytes, float *arg1) {
 
 	uint32_t temp = 0;
-	temp = ((FirstReceivedBytes[0] << 24) | (FirstReceivedBytes[1] << 16)
-			| (FirstReceivedBytes[2] << 8) | FirstReceivedBytes[3] << 0);
+	/* shifting four bytes and casting them into float */
+	temp = ((ReceivedBytes[0] << 0) | (ReceivedBytes[1] << 8)
+			| (ReceivedBytes[2] << 16) | ReceivedBytes[3] << 24);
 	*arg1 = *((float*) &temp);
 
 	return 0;
@@ -185,8 +185,8 @@ uint8_t ProcessReceivedFloat(uint8_t *FirstReceivedBytes, float *arg1) {
  */
 uint8_t SetPosition(float Position, float Duration) {
 
-	ConvertFloatTwoBytes(Position, var1);
-	ConvertFloatTwoBytes(Duration, var2);
+	ConvertFloatTwoBytes(Position, FirstBytesSentMSG);
+	ConvertFloatTwoBytes(Duration, SecondBytesSentMSG);
 	PrepareMessage(SET_POSITION);
 	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
 
@@ -215,14 +215,15 @@ uint8_t GetPosition(float *Position) {
 	ProcessReceivedCommand(&command);
 	if (command == GET_POSITION) {
 
-		ProcessReceivedFloat(FirstReceivedBytes, Position);
-		/*  // only for verifying results
-		 *
-		 * 	ConvertFloatTwoBytes(Position, var1);
-		 * 	ConvertFloatTwoBytes(Position, var2);
-		 * 	PrepareMessage(command);
-		 * 	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
-		 * */
+		ProcessReceivedFloat(SecondBytesRevdMSG, Position);
+		 // only for verifying results
+
+		  	ConvertFloatTwoBytes(*Position, FirstBytesSentMSG);
+		  	ConvertFloatTwoBytes(*Position, SecondBytesSentMSG);
+
+		  	PrepareMessage(command);
+		  	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
+
 
 	}
 
@@ -238,9 +239,9 @@ uint8_t GetPosition(float *Position) {
  * @param  Duration of the movement expressed in ms.
  */
 
-uint8_t SetSpeed(uint16_t Time, int16_t Velcity) {
-	ConvertUint16TwoBytes(Time, var1);
-	ConvertInt16TwoBytes(Velcity, var2);
+uint8_t SetSpeed(uint16_t Time, int16_t Speed) {
+	ConvertUint16TwoBytes(Time, FirstBytesSentMSG);
+	ConvertInt16TwoBytes(Speed, SecondBytesSentMSG);
 	PrepareMessage(SET_SPEED);
 	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
 }
@@ -264,7 +265,7 @@ uint8_t GetMoveDuration(float *Duration) {
 	uint8_t command;
 	ProcessReceivedCommand(&command);
 	if (command == GET_MOVE_DURATON) {
-		ProcessReceivedFloat(FirstReceivedBytes, Duration);
+		ProcessReceivedFloat(FirstBytesRevdMSG, Duration);
 	}
 
 	return 0;
