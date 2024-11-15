@@ -19,6 +19,7 @@
 #include "H19R0_dma.h"
 #include "H19R0_inputs.h"
 #include "H19R0_eeprom.h"
+#include"Commands_Driver_APIs.h"
 
 /* Exported definitions -------------------------------------------------------*/
 #define modulePN    _H19R0
@@ -118,6 +119,15 @@ extern void MX_USART6_UART_Init(void);
  |                               APIs                                    |
  -----------------------------------------------------------------------
  */
+
+/**
+ * @brief Programs a position command for Motor in the given @p Duration time.
+ *
+ * @param  Position Target mechanical angle reference at the end of the movement.
+ *         This value represents the final position expressed in radian.
+ * @param  Duration of the movement expressed in seconds.
+ */
+uint8_t SetPositionMotor(float Position, float Duration);
 
 /* -----------------------------------------------------------------------
  |                             Commands                                  |

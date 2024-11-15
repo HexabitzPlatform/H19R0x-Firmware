@@ -406,6 +406,14 @@ uint8_t GetPort(UART_HandleTypeDef *huart) {
  -----------------------------------------------------------------------
  */
 
+uint8_t SetPositionMotor(float Position, float Duration) {
+
+	SetPosition(Position, Duration);
+
+	return 0;
+}
+
+
 /* -----------------------------------------------------------------------
  |                             Commands                                  |
  -----------------------------------------------------------------------
