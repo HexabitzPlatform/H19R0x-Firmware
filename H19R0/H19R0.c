@@ -436,7 +436,10 @@ Module_Status Module_MessagingTask(uint16_t code, uint8_t port, uint8_t src, uin
 
   switch (code)
   {
-
+	case CODE_H19R0_SAMPLE_POS: {
+		Exporttoport(cMessage[port - 1][shift], cMessage[port - 1][1 + shift],POS);
+		break;
+	}
 	default:
 		result = H19R0_ERR_UnknownMessage;
 		break;
@@ -518,6 +521,23 @@ Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function) {
 			temp[3] =(uint8_t )((*(uint32_t* )&position) >> 24);
 
 			writePxITMutex(port, (char*) &temp[0], 4* sizeof(uint8_t), 10);
+		}
+		else {
+			/* LSB first */
+			if (H19R0_OK == status)
+				messageParams[1] = BOS_OK;
+			else
+				messageParams[1] = BOS_ERROR;
+
+			messageParams[0] = FMT_FLOAT;
+			messageParams[2] = 1;
+			messageParams[3] = (uint8_t) ((*(uint32_t*) &position) >> 0);
+			messageParams[4] = (uint8_t) ((*(uint32_t*) &position) >> 8);
+			messageParams[5] = (uint8_t) ((*(uint32_t*) &position) >> 16);
+			messageParams[6] = (uint8_t) ((*(uint32_t*) &position) >> 24);
+
+			SendMessageToModule(module, CODE_READ_RESPONSE,
+					(sizeof(float) * 1) + 3);
 		}
 		break;
 	default:
