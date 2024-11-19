@@ -45,13 +45,17 @@ module_param_t modParam[NUM_MODULE_PARAMS];
 TaskHandle_t BLDC_TaskTaskHandle = NULL;
 static bool stopStream = false;
 uint8_t StopeCliStreamFlag;
+/* Exported Typedef ----------------------------------------------------------*/
+typedef void (*SampleMemsToBuffer)(float *buffer);
+
 /* Private function prototypes -----------------------------------------------*/
 void BLDCTask(void *argument);
 Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function);
 Module_Status Exportstreamtoport(uint8_t module,uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout);
 Module_Status Exportstreamtoterminal(uint8_t Port,All_Data function,uint32_t Numofsamples,uint32_t timeout);
 static Module_Status PollingSleepCLISafe(uint32_t period,long Numofsamples);
-
+static Module_Status StreamMemsToBuf(float *buffer,uint32_t Numofsamples,uint32_t timeout,SampleMemsToBuffer function);
+void SamplePosBuff(float *buffer);
 /* Create CLI commands --------------------------------------------------------*/
 
 
@@ -546,6 +550,47 @@ static Module_Status PollingSleepCLISafe(uint32_t period,long Numofsamples){
 	vTaskDelay(pdMS_TO_TICKS(lastDelayMS));
 	return H19R0_OK;
 }
+
+/*-----------------------------------------------------------*/
+static Module_Status StreamMemsToBuf(float *buffer,uint32_t Numofsamples,uint32_t timeout,SampleMemsToBuffer function){
+	Module_Status status =H19R0_OK;
+	uint32_t period =timeout / Numofsamples;
+	if(period < MIN_MEMS_PERIOD_MS)
+		return H19R0_ERR_WrongParams;
+
+	// TODO: Check if CLI is enable or not
+
+	if(period > timeout)
+		timeout =period;
+
+	long numTimes =timeout / period;
+	stopStream = false;
+
+	while((numTimes-- > 0) || (timeout >= MAX_MEMS_TIMEOUT_MS)){
+		if(function == SamplePosBuff){
+			float sample;
+			function(&sample);
+			buffer[Index] =sample;
+			Index++;
+
+		}
+
+		vTaskDelay(pdMS_TO_TICKS(period));
+		if(stopStream){
+			status =H19R0_ERR_TERMINATED;
+			break;
+		}
+	}
+	return status;
+}
+
+/*-----------------------------------------------------------*/
+void SamplePosBuff(float *buffer){
+	float Pos;
+	GetPositionMotor(&Pos);
+	*buffer =Pos;
+}
+
 /* -----------------------------------------------------------------------
  |                               APIs                                    |
  -----------------------------------------------------------------------
@@ -613,6 +658,13 @@ Module_Status StreamToTerminal(uint8_t port,All_Data function,uint32_t Numofsamp
 
 Module_Status StreamToBuffer(float *buffer,All_Data function,uint32_t Numofsamples,uint32_t timeout){
 
+	switch(function){
+		case POS:
+			return StreamMemsToBuf(buffer,Numofsamples,timeout,SamplePosBuff);
+			break;
+		default:
+			break;
+	}
 }
 
 
