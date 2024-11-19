@@ -87,6 +87,10 @@
 // Module Addressing Space 500 - 599
 #define _EE_MODULE							500
 
+/* Choose the functionality of stream and sample APIs */
+typedef enum {
+	POS =0, MOD,
+} All_Data;
 
 /* Module_Status Type Definition */
 typedef enum {
