@@ -80,6 +80,8 @@
 #define USART6_AF       GPIO_AF8_USART6
 
 /* Module-specific Definitions */
+#define MIN_MEMS_PERIOD_MS		100
+#define MAX_MEMS_TIMEOUT_MS		0xFFFFFFFF
 #define NUM_MODULE_PARAMS						1
 
 #define MIN_PERIOD_MS			100
@@ -103,6 +105,7 @@ typedef enum {
 	H19R0_OK = 0,
 	H19R0_ERR_UnknownMessage,
 	H19R0_ERR_WrongParams,
+	H19R0_ERR_TERMINATED,
 	H19R0_ERROR = 255
 } Module_Status;
 

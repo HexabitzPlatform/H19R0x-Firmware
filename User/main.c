@@ -41,7 +41,7 @@ void UserTask(void *argument) {
 	//Test_Function();
 
 
-	StreamtoPort(0, 2, POS, 10, 10000);
+	StreamToTerminal(2, POS, 10, 10000);
 	while (1) {
 		HAL_GPIO_TogglePin(_IND_LED_PORT, _IND_LED_PIN);
 		// SampletoPort(0, 2, POS);

@@ -43,10 +43,14 @@ module_param_t modParam[NUM_MODULE_PARAMS];
 
 /* Private variables ---------------------------------------------------------*/
 TaskHandle_t BLDC_TaskTaskHandle = NULL;
+static bool stopStream = false;
+uint8_t StopeCliStreamFlag;
 /* Private function prototypes -----------------------------------------------*/
 void BLDCTask(void *argument);
 Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function);
 Module_Status Exportstreamtoport(uint8_t module,uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout);
+Module_Status Exportstreamtoterminal(uint8_t Port,All_Data function,uint32_t Numofsamples,uint32_t timeout);
+static Module_Status PollingSleepCLISafe(uint32_t period,long Numofsamples);
 
 /* Create CLI commands --------------------------------------------------------*/
 
@@ -412,10 +416,10 @@ void BLDCTask(void *argument) {
 			Exportstreamtoport(Module[0], Port[0], mode[0], numofsamples[0],
 					Timeout[0]);
 			break;
-//		case STREAM_TO_Terminal:
-//			Exportstreamtoterminal(Port[1], mode[1], numofsamples[1],
-//					Timeout[1]);
-//			break;
+		case STREAM_TO_Terminal:
+			Exportstreamtoterminal(Port[1], mode[1], numofsamples[1],
+					Timeout[1]);
+			break;
 		default:
 			osDelay(10);
 			break;
@@ -475,7 +479,73 @@ Module_Status Exportstreamtoport(uint8_t module,uint8_t port,All_Data function,u
 
 	return status;
 }
+/*-----------------------------------------------------------*/
+Module_Status Exportstreamtoterminal(uint8_t Port,All_Data function,uint32_t Numofsamples,uint32_t timeout){
+	Module_Status status =H19R0_OK;
+	int8_t *pcOutputString = NULL;
+	uint32_t period =timeout / Numofsamples;
+	char cstring[100];
+	float position =0;
 
+	if(period < MIN_MEMS_PERIOD_MS)
+		return H19R0_ERR_WrongParams;
+
+	// TODO: Check if CLI is enable or not
+	switch(function){
+		case POS:
+
+			if(period > timeout)
+				timeout =period;
+
+			stopStream = false;
+
+			while((Numofsamples-- > 0) || (timeout >= MAX_MEMS_TIMEOUT_MS)){
+				pcOutputString =FreeRTOS_CLIGetOutputBuffer();
+				if((status =GetPositionMotor(&position)) != H19R0_OK)
+					return status;
+
+				snprintf(cstring,50,"Position(rad) : %.2f \r\n",position);
+
+				writePxMutex(Port,(char* )cstring,strlen((char* )cstring),
+				cmd500ms,HAL_MAX_DELAY);
+				if(PollingSleepCLISafe(period,Numofsamples) != H19R0_OK)
+					break;
+			}
+			break;
+
+		default:
+			status =H19R0_ERR_WrongParams;
+			break;
+	}
+
+	bldcMode = DEFAULT;
+	return status;
+}
+/*-----------------------------------------------------------*/
+static Module_Status PollingSleepCLISafe(uint32_t period,long Numofsamples){
+	const unsigned DELTA_SLEEP_MS =100; // milliseconds
+	long numDeltaDelay =period / DELTA_SLEEP_MS;
+	unsigned lastDelayMS =period % DELTA_SLEEP_MS;
+
+	while(numDeltaDelay-- > 0){
+		vTaskDelay(pdMS_TO_TICKS(DELTA_SLEEP_MS));
+
+		// Look for ENTER key to stop the stream
+		for(uint8_t chr =1; chr < MSG_RX_BUF_SIZE; chr++){
+			if(UARTRxBuf[PcPort - 1][chr] == '\r'){
+				UARTRxBuf[PcPort - 1][chr] =0;
+				StopeCliStreamFlag =1;
+				return H19R0_ERR_TERMINATED;
+			}
+		}
+
+		if(stopStream)
+			return H19R0_ERR_TERMINATED;
+	}
+
+	vTaskDelay(pdMS_TO_TICKS(lastDelayMS));
+	return H19R0_OK;
+}
 /* -----------------------------------------------------------------------
  |                               APIs                                    |
  -----------------------------------------------------------------------
@@ -526,7 +596,17 @@ Module_Status StreamtoPort(uint8_t module,uint8_t port,All_Data function,uint32_
 /*-----------------------------------------------------------*/
 
 Module_Status StreamToTerminal(uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout){
+	Module_Status status =H19R0_OK;
 
+	if(0 == port)
+		return status =H19R0_ERR_WrongParams;
+
+	bldcMode =STREAM_TO_Terminal;
+	Port[1] =port;
+	numofsamples[1] =Numofsamples;
+	Timeout[1] =timeout;
+	mode[1] =function;
+	return status;
 }
 
 /*-----------------------------------------------------------*/
