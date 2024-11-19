@@ -32,15 +32,21 @@ UART_HandleTypeDef huart6;
 extern FLASH_ProcessTypeDef pFlash;
 extern uint8_t numOfRecordedSnippets;
 EventGroupHandle_t handleNewReadyData = NULL;
+/* variables for Streams ----------------------------------------------------*/
+uint32_t numofsamples[2], Timeout[2];
+uint8_t Port[2], Module[2], mode[2];
+uint8_t bldcMode;
+uint16_t Index =0;
 
 /* Module exported parameters ------------------------------------------------*/
 module_param_t modParam[NUM_MODULE_PARAMS];
 
 /* Private variables ---------------------------------------------------------*/
-
+TaskHandle_t BLDC_TaskTaskHandle = NULL;
 /* Private function prototypes -----------------------------------------------*/
-
+void BLDCTask(void *argument);
 Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function);
+Module_Status Exportstreamtoport(uint8_t module,uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout);
 
 /* Create CLI commands --------------------------------------------------------*/
 
@@ -221,10 +227,10 @@ void Module_Peripheral_Init(void) {
 		}
 	}
 
-	/* Create a ToF task */
-//	xTaskCreate(ToFTask, (const char*) "ToFTask",
-//			(2 * configMINIMAL_STACK_SIZE), NULL,
-//			osPriorityNormal - osPriorityIdle, &ToFHandle);
+	/* Create a BLDC task */
+	xTaskCreate(BLDCTask, (const char*) "BLDCTask",
+			(2 * configMINIMAL_STACK_SIZE), NULL,
+			osPriorityNormal - osPriorityIdle, &BLDC_TaskTaskHandle);
 
 }
 
@@ -397,12 +403,27 @@ uint8_t GetPort(UART_HandleTypeDef *huart) {
 /* --- BLDC streaming task
  */
 
-//void BLDCTask(void *argument) {
-//
-//		taskYIELD();
-//}
+void BLDCTask(void *argument) {
 
-/*-----------------------------------------------------------*/
+	/* Infinite loop */
+	for (;;) {
+		switch (bldcMode) {
+		case STREAM_TO_PORT:
+			Exportstreamtoport(Module[0], Port[0], mode[0], numofsamples[0],
+					Timeout[0]);
+			break;
+//		case STREAM_TO_Terminal:
+//			Exportstreamtoterminal(Port[1], mode[1], numofsamples[1],
+//					Timeout[1]);
+//			break;
+		default:
+			osDelay(10);
+			break;
+		}
+
+		taskYIELD();
+	}
+}
 
 /*-----------------------------------------------------------*/
 Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function) {
@@ -431,6 +452,26 @@ Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function) {
 		break;
 	}
 
+
+	return status;
+}
+
+/*-----------------------------------------------------------*/
+Module_Status Exportstreamtoport(uint8_t module,uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout){
+	Module_Status status =H19R0_OK;
+	uint32_t samples =0;
+	uint32_t period =0;
+	period =timeout / Numofsamples;
+
+	if(timeout < MIN_PERIOD_MS || period < MIN_PERIOD_MS)
+		return H19R0_ERR_WrongParams;
+
+	while(samples < Numofsamples){
+		status =Exporttoport(module,port,function);
+		vTaskDelay(pdMS_TO_TICKS(period));
+		samples++;
+	}
+	bldcMode = DEFAULT;
 
 	return status;
 }
@@ -468,7 +509,18 @@ Module_Status SampletoPort(uint8_t module,uint8_t port,All_Data function){
 }
 /*-----------------------------------------------------------*/
 Module_Status StreamtoPort(uint8_t module,uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout){
+	Module_Status status =H19R0_OK;
 
+	if(port == 0 && module == myID)
+		return status =H19R0_ERR_WrongParams;
+
+	bldcMode =STREAM_TO_PORT;
+	Port[0] =port;
+	Module[0] =module;
+	numofsamples[0] =Numofsamples;
+	Timeout[0] =timeout;
+	mode[0] =function;
+	return status;
 }
 
 /*-----------------------------------------------------------*/

@@ -10,7 +10,7 @@
 #include "Commands_Driver_APIs.h"
 
 /* Private variables ---------------------------------------------------------*/
-uint8_t MSG_P[5]="Hello";
+float Position;
 /* Private function prototypes -----------------------------------------------*/
 
 /* Main function ------------------------------------------------------------*/
@@ -21,6 +21,7 @@ int main(void) {
 
 	//Don't place your code here.
 	for (;;) {
+
 	}
 }
 
@@ -30,8 +31,22 @@ int main(void) {
 void UserTask(void *argument) {
 
 	// put your code here, to run repeatedly.
-	ReceiveMessage();
+
+	// SetPosition(3.26, 1020);
+	GetPositionMotor(&Position);
+
+//	SetPositionMotor(3.26, 1020);
+	// SetSpeed(1000,500);
+
+	//Test_Function();
+
+
+	StreamtoPort(0, 2, POS, 10, 10000);
 	while (1) {
+		HAL_GPIO_TogglePin(_IND_LED_PORT, _IND_LED_PIN);
+		// SampletoPort(0, 2, POS);
+
+		HAL_Delay(1000);
 
 	}
 }

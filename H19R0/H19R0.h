@@ -82,6 +82,12 @@
 /* Module-specific Definitions */
 #define NUM_MODULE_PARAMS						1
 
+#define MIN_PERIOD_MS			100
+/* Macros For BLDC special Task */
+#define SAMPLE_TO_PORT          1
+#define STREAM_TO_PORT          2
+#define STREAM_TO_Terminal      3
+#define DEFAULT                 4
 /* Module EEPROM Variables */
 
 // Module Addressing Space 500 - 599
