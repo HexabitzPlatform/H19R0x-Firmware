@@ -47,6 +47,7 @@ static bool stopStream = false;
 uint8_t StopeCliStreamFlag;
 /* Exported Typedef ----------------------------------------------------------*/
 typedef void (*SampleMemsToBuffer)(float *buffer);
+typedef void (*SampleToString)(char*,size_t);
 
 /* Private function prototypes -----------------------------------------------*/
 void BLDCTask(void *argument);
@@ -58,7 +59,11 @@ static Module_Status StreamMemsToBuf(float *buffer,uint32_t Numofsamples,uint32_
 void SamplePosBuff(float *buffer);
 /* Create CLI commands --------------------------------------------------------*/
 static portBASE_TYPE SampleMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
+static portBASE_TYPE StreamMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
 
+/* Private CLI functions */
+static Module_Status StreamToCLI(uint32_t Numofsamples,uint32_t timeout,SampleToString function);
+void SamplePosToString(char *cstring,size_t maxLen);
 /*-----------------------------------------------------------*/
 /* CLI command structure : sample */
 const CLI_Command_Definition_t SampleCommandDefinition = {
@@ -69,11 +74,64 @@ const CLI_Command_Definition_t SampleCommandDefinition = {
 };
 
 /*-----------------------------------------------------------*/
-/* CLI command structure : streamtocli */
-
+/* CLI command structure : stream */
+const CLI_Command_Definition_t StreamCommandDefinition = {
+	(const int8_t *) "stream",
+	(const int8_t *) "stream:\r\n Syntax: stream [Pos]/[Mod] ( Numofsamples ) (timeout) .\r\n\r\n",
+	StreamMotorCommand,
+	-1
+};
 /*-----------------------------------------------------------*/
-/* CLI command structure : streamtoport */
+/* CLI command structure : streamtcli */
+/*-----------------------------------------------------------*/
+static Module_Status StreamToCLI(uint32_t Numofsamples,uint32_t timeout,SampleToString function){
+	Module_Status status =H19R0_OK;
+	int8_t *pcOutputString = NULL;
+	uint32_t period =timeout / Numofsamples;
+	if(period < MIN_MEMS_PERIOD_MS)
+		return H19R0_ERR_WrongParams;
 
+	// TODO: Check if CLI is enable or not
+	for(uint8_t chr =0; chr < MSG_RX_BUF_SIZE; chr++){
+		if(UARTRxBuf[PcPort - 1][chr] == '\r'){
+			UARTRxBuf[PcPort - 1][chr] =0;
+		}
+	}
+	if(1 == StopeCliStreamFlag){
+		StopeCliStreamFlag =0;
+		static char *pcOKMessage =(int8_t* )"Stop stream !\n\r";
+		writePxITMutex(PcPort,pcOKMessage,strlen(pcOKMessage),10);
+		return status;
+	}
+	if(period > timeout)
+		timeout =period;
+
+	long numTimes =timeout / period;
+	stopStream = false;
+
+	while((numTimes-- > 0) || (timeout >= MAX_MEMS_TIMEOUT_MS)){
+		pcOutputString =FreeRTOS_CLIGetOutputBuffer();
+		function((char* )pcOutputString,100);
+
+		writePxMutex(PcPort,(char* )pcOutputString,strlen((char* )pcOutputString),cmd500ms,HAL_MAX_DELAY);
+		if(PollingSleepCLISafe(period,Numofsamples) != H19R0_OK)
+			break;
+	}
+
+	memset((char* )pcOutputString,0,configCOMMAND_INT_MAX_OUTPUT_SIZE);
+	sprintf((char* )pcOutputString,"\r\n");
+	return status;
+}
+/*-----------------------------------------------------------*/
+void SamplePosToString(char *cstring,size_t maxLen){
+
+	float pose;
+
+	GetPositionMotor(&pose);
+
+	snprintf(cstring,maxLen,"Pos(rad) : %.2f \r\n",pose);
+
+}
 /*-----------------------------------------------------------*/
 /* CLI command structure : sampletoport */
 
@@ -393,6 +451,7 @@ Module_Status Module_MessagingTask(uint16_t code, uint8_t port, uint8_t src, uin
  */
 void RegisterModuleCLICommands(void) {
 	FreeRTOS_CLIRegisterCommand(&SampleCommandDefinition);
+	FreeRTOS_CLIRegisterCommand(&StreamCommandDefinition);
 }
 
 /*-----------------------------------------------------------*/
@@ -710,7 +769,92 @@ static portBASE_TYPE SampleMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBuffe
 	snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Error reading Sensor\r\n");
 	return pdFALSE;
 }
+
 /*-----------------------------------------------------------*/
+// Port Mode => false and CLI Mode => true
+static bool StreamCommandParser(const int8_t *pcCommandString,const char **ppSensName,portBASE_TYPE *pSensNameLen,
+bool *pPortOrCLI,uint32_t *pPeriod,uint32_t *pTimeout,uint8_t *pPort,uint8_t *pModule){
+	const char *pPeriodMSStr = NULL;
+	const char *pTimeoutMSStr = NULL;
+
+	portBASE_TYPE periodStrLen =0;
+	portBASE_TYPE timeoutStrLen =0;
+
+	const char *pPortStr = NULL;
+	const char *pModStr = NULL;
+
+	portBASE_TYPE portStrLen =0;
+	portBASE_TYPE modStrLen =0;
+
+	*ppSensName =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,1,pSensNameLen);
+	pPeriodMSStr =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,2,&periodStrLen);
+	pTimeoutMSStr =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,3,&timeoutStrLen);
+
+	// At least 3 Parameters are required!
+	if((*ppSensName == NULL) || (pPeriodMSStr == NULL) || (pTimeoutMSStr == NULL))
+		return false;
+
+	// TODO: Check if Period and Timeout are integers or not!
+	*pPeriod =atoi(pPeriodMSStr);
+	*pTimeout =atoi(pTimeoutMSStr);
+	*pPortOrCLI = true;
+
+	pPortStr =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,4,&portStrLen);
+	pModStr =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,5,&modStrLen);
+
+	if((pModStr == NULL) && (pPortStr == NULL))
+		return true;
+	if((pModStr == NULL) || (pPortStr == NULL))	// If user has provided 4 Arguments.
+		return false;
+
+	*pPort =atoi(pPortStr);
+	*pModule =atoi(pModStr);
+	*pPortOrCLI = false;
+
+	return true;
+}
+
+/*-----------------------------------------------------------*/
+static portBASE_TYPE StreamMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLen,const int8_t *pcCommandString){
+	const char *const PosCmdName ="pos";
+
+	uint32_t Numofsamples =0;
+	uint32_t timeout =0;
+	uint8_t port =0;
+	uint8_t module =0;
+
+	bool portOrCLI = true; // Port Mode => false and CLI Mode => true
+
+	const char *pSensName = NULL;
+	portBASE_TYPE sensNameLen =0;
+
+	// Make sure we return something
+	*pcWriteBuffer ='\0';
+
+	if(!StreamCommandParser(pcCommandString,&pSensName,&sensNameLen,&portOrCLI,&Numofsamples,&timeout,&port,&module)){
+		snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Invalid Arguments\r\n");
+		return pdFALSE;
+	}
+
+	do{
+		if(!strncmp(pSensName,PosCmdName,strlen(PosCmdName))){
+			if(portOrCLI){
+				StreamToCLI(Numofsamples,timeout,SamplePosToString);
+			}
+
+		}
+		else{
+			snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Invalid Arguments\r\n");
+		}
+
+		snprintf((char* )pcWriteBuffer,xWriteBufferLen,"\r\n");
+		return pdFALSE;
+	} while(0);
+
+	snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Error reading Sensor\r\n");
+	return pdFALSE;
+}
+
 
 
 /*-----------------------------------------------------------*/
