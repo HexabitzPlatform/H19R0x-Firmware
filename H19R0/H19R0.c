@@ -40,6 +40,7 @@ module_param_t modParam[NUM_MODULE_PARAMS];
 
 /* Private function prototypes -----------------------------------------------*/
 
+Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function);
 
 /* Create CLI commands --------------------------------------------------------*/
 
@@ -401,6 +402,39 @@ uint8_t GetPort(UART_HandleTypeDef *huart) {
 //		taskYIELD();
 //}
 
+/*-----------------------------------------------------------*/
+
+/*-----------------------------------------------------------*/
+Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function) {
+
+	float position;
+	static uint8_t temp[4] = { 0 };
+	Module_Status status = H19R0_OK;
+
+	switch (function) {
+	case POS:
+
+		if ((status = GetPositionMotor(&position)) != H19R0_OK)
+			return status = H19R0_ERROR;
+
+		if (module == myID || module == 0) {
+			temp[0] =(uint8_t )((*(uint32_t* )&position) >> 0);
+			temp[1] =(uint8_t )((*(uint32_t* )&position) >> 8);
+			temp[2] =(uint8_t )((*(uint32_t* )&position) >> 16);
+			temp[3] =(uint8_t )((*(uint32_t* )&position) >> 24);
+
+			writePxITMutex(port, (char*) &temp[0], 4* sizeof(uint8_t), 10);
+		}
+		break;
+	default:
+		status = H19R0_ERR_WrongParams;
+		break;
+	}
+
+
+	return status;
+}
+
 /* -----------------------------------------------------------------------
  |                               APIs                                    |
  -----------------------------------------------------------------------
@@ -422,6 +456,14 @@ uint8_t GetPositionMotor(float *Position){
 
 /*-----------------------------------------------------------*/
 Module_Status SampletoPort(uint8_t module,uint8_t port,All_Data function){
+	Module_Status status =H19R0_OK;
+
+	if(port == 0 && module == myID)
+		return status =H19R0_ERR_WrongParams;
+
+	Exporttoport(module,port,function);
+
+	return status;
 
 }
 /*-----------------------------------------------------------*/

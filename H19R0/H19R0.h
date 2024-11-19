@@ -96,6 +96,7 @@ typedef enum {
 typedef enum {
 	H19R0_OK = 0,
 	H19R0_ERR_UnknownMessage,
+	H19R0_ERR_WrongParams,
 	H19R0_ERROR = 255
 } Module_Status;
 
