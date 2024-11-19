@@ -57,10 +57,16 @@ static Module_Status PollingSleepCLISafe(uint32_t period,long Numofsamples);
 static Module_Status StreamMemsToBuf(float *buffer,uint32_t Numofsamples,uint32_t timeout,SampleMemsToBuffer function);
 void SamplePosBuff(float *buffer);
 /* Create CLI commands --------------------------------------------------------*/
-
+static portBASE_TYPE SampleMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
 
 /*-----------------------------------------------------------*/
 /* CLI command structure : sample */
+const CLI_Command_Definition_t SampleCommandDefinition = {
+	(const int8_t *) "sample",
+	(const int8_t *) "sample:\r\n Syntax: sample [Pos]/[Mod].\r\n\r\n",
+	SampleMotorCommand,
+	1
+};
 
 /*-----------------------------------------------------------*/
 /* CLI command structure : streamtocli */
@@ -386,7 +392,7 @@ Module_Status Module_MessagingTask(uint16_t code, uint8_t port, uint8_t src, uin
 /* --- Register this module CLI Commands
  */
 void RegisterModuleCLICommands(void) {
-
+	FreeRTOS_CLIRegisterCommand(&SampleCommandDefinition);
 }
 
 /*-----------------------------------------------------------*/
@@ -672,7 +678,38 @@ Module_Status StreamToBuffer(float *buffer,All_Data function,uint32_t Numofsampl
  |                             Commands                                  |
  -----------------------------------------------------------------------
  */
+static portBASE_TYPE SampleMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLen,const int8_t *pcCommandString){
+	const char *const PosCmdName ="pos";
 
+
+	const char *pSensName = NULL;
+	portBASE_TYPE sensNameLen =0;
+
+	// Make sure we return something
+	*pcWriteBuffer ='\0';
+
+	pSensName =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,1,&sensNameLen);
+
+	if(pSensName == NULL){
+		snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Invalid Arguments\r\n");
+		return pdFALSE;
+	}
+
+	do{
+		if(!strncmp(pSensName,PosCmdName,strlen(PosCmdName))){
+			Exportstreamtoterminal(PcPort,POS,1,500);
+
+		}
+		else{
+			snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Invalid Arguments\r\n");
+		}
+
+		return pdFALSE;
+	} while(0);
+
+	snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Error reading Sensor\r\n");
+	return pdFALSE;
+}
 /*-----------------------------------------------------------*/
 
 
