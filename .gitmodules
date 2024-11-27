@@ -4,3 +4,6 @@
 [submodule "Thirdparty"]
 	path = Thirdparty
 	url = https://github.com/HexabitzPlatform/Thirdparty
+[submodule "STSPIN-Firmware"]
+	path = STSPIN-Firmware
+	url = https://github.com/HexabitzPlatform/STSPIN-Firmware.git
