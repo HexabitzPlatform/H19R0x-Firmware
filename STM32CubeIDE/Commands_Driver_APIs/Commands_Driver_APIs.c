@@ -201,6 +201,7 @@ uint8_t SetPosition(float Position, float Duration) {
  *   */
 uint8_t GetPosition(float *Position) {
 
+//	*Position = 4.78;
 	ReceiveMessage();
 	PrepareMessage(GET_POSITION);
 	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
@@ -215,14 +216,14 @@ uint8_t GetPosition(float *Position) {
 	ProcessReceivedCommand(&command);
 	if (command == GET_POSITION) {
 
-		ProcessReceivedFloat(SecondBytesRevdMSG, Position);
+		ProcessReceivedFloat(FirstBytesRevdMSG, Position);
 		 // only for verifying results
 
-		  	ConvertFloatTwoBytes(*Position, FirstBytesSentMSG);
-		  	ConvertFloatTwoBytes(*Position, SecondBytesSentMSG);
-
-		  	PrepareMessage(command);
-		  	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
+//		  	ConvertFloatTwoBytes(*Position, FirstBytesSentMSG);
+//		  	ConvertFloatTwoBytes(*Position, SecondBytesSentMSG);
+//
+//		  	PrepareMessage(command);
+//		  	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
 
 
 	}

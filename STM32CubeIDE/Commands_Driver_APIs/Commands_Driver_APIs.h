@@ -24,8 +24,9 @@ extern "C" {
 /* Module_Status Type Definition */
 
 typedef enum {
-	START_MOTOR=0,
+	IDEL,
 	STOP_MOTOR,
+	START_MOTOR,
 	SET_SPEED,
 	SET_TORQUE,
 	SET_POSITION,
