@@ -135,6 +135,11 @@ extern void MX_USART6_UART_Init(void);
  */
 
 /**
+ * @brief Programs stop rotation of Motor.
+ *
+ */
+uint8_t StopMotor();
+/**
  * @brief Programs a position command for Motor in the given @p Duration time.
  *
  * @param  Position Target mechanical angle reference at the end of the movement.
@@ -151,6 +156,16 @@ uint8_t SetPositionMotor(float Position, float Duration);
  *  	get position from initial position in radian
  *   */
 uint8_t GetPositionMotor(float *Position);
+
+/**********************************************************************/
+/**
+ * @brief Programs a speed command for Motor in the given @p Duration Time.
+ *
+ * @param  Speed Target mechanical angle reference at the end of the movement.
+ *         This value represents the final position expressed in rpm.
+ * @param  Duration of the movement expressed in ms.
+ */
+uint8_t SetSpeedMotor(uint16_t Time, int16_t Speed);
 
 
 Module_Status SampletoPort(uint8_t module,uint8_t port,All_Data function);

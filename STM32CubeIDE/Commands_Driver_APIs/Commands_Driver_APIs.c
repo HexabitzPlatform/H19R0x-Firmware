@@ -177,6 +177,25 @@ uint8_t ProcessReceivedFloat(uint8_t *ReceivedBytes, float *arg1) {
 /**************************************************************************/
 
 /**
+ * @brief Stop rotation command for Motor.
+ */
+uint8_t Stop() {
+
+	FirstBytesSentMSG[0] = 0;
+	FirstBytesSentMSG[1] = 0;
+	FirstBytesSentMSG[2] = 0;
+	FirstBytesSentMSG[3] = 0;
+
+	SecondBytesSentMSG[0] = 0;
+	SecondBytesSentMSG[1] = 0;
+	SecondBytesSentMSG[2] = 0;
+	SecondBytesSentMSG[3] = 0;
+	PrepareMessage(STOP_MOTOR);
+	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
+
+	return 0;
+}
+/**
  * @brief Programs a position command for Motor in the given @p Duration time.
  *
  * @param  Position Target mechanical angle reference at the end of the movement.
@@ -223,7 +242,7 @@ uint8_t GetPosition(float *Position) {
 //		  	ConvertFloatTwoBytes(*Position, SecondBytesSentMSG);
 //
 //		  	PrepareMessage(command);
-//		  	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
+	//	  	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
 
 
 	}

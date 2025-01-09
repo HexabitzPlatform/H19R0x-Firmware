@@ -680,6 +680,12 @@ void SamplePosBuff(float *buffer){
  |                               APIs                                    |
  -----------------------------------------------------------------------
  */
+uint8_t StopMotor() {
+
+	Stop();
+
+	return 0;
+}
 
 uint8_t SetPositionMotor(float Position, float Duration) {
 
@@ -691,6 +697,13 @@ uint8_t SetPositionMotor(float Position, float Duration) {
 
 uint8_t GetPositionMotor(float *Position){
 	GetPosition(Position);
+
+	return 0;
+}
+
+uint8_t SetSpeedMotor(uint16_t Time, int16_t Speed) {
+
+	SetSpeed(Time, Speed);
 
 	return 0;
 }
