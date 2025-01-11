@@ -168,6 +168,8 @@ uint8_t GetPositionMotor(float *Position);
 uint8_t SetSpeedMotor(uint16_t Time, int16_t Speed);
 
 
+
+uint8_t GetModeMotor(uint8_t* Mode);
 Module_Status SampletoPort(uint8_t module,uint8_t port,All_Data function);
 Module_Status StreamtoPort(uint8_t module,uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout);
 Module_Status StreamToTerminal(uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout);

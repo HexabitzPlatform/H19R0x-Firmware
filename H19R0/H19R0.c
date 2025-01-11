@@ -505,6 +505,7 @@ void BLDCTask(void *argument) {
 Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function) {
 
 	float position;
+	uint8_t mode;
 	static uint8_t temp[4] = { 0 };
 	Module_Status status = H19R0_OK;
 
@@ -538,6 +539,30 @@ Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function) {
 
 			SendMessageToModule(module, CODE_READ_RESPONSE,
 					(sizeof(float) * 1) + 3);
+		}
+		break;
+	case MOD:
+
+		if ((status = GetModeMotor(&mode)) != H19R0_OK)
+			return status = H19R0_ERROR;
+
+		if (module == myID || module == 0) {
+			writePxITMutex(port, (char*) &mode, sizeof(uint8_t), 10);
+		}
+		else {
+			/* LSB first */
+			if (H19R0_OK == status)
+				messageParams[1] = BOS_OK;
+			else
+				messageParams[1] = BOS_ERROR;
+
+			messageParams[0] = FMT_UINT8;
+			messageParams[2] = 1;
+			messageParams[3] = (uint8_t) mode;
+
+
+			SendMessageToModule(module, CODE_READ_RESPONSE,
+					(sizeof(uint8_t) * 1) + 3);
 		}
 		break;
 	default:
@@ -575,6 +600,7 @@ Module_Status Exportstreamtoterminal(uint8_t Port,All_Data function,uint32_t Num
 	uint32_t period =timeout / Numofsamples;
 	char cstring[100];
 	float position =0;
+	uint8_t mode = 0;
 
 	if(period < MIN_MEMS_PERIOD_MS)
 		return H19R0_ERR_WrongParams;
@@ -593,7 +619,7 @@ Module_Status Exportstreamtoterminal(uint8_t Port,All_Data function,uint32_t Num
 				if((status =GetPositionMotor(&position)) != H19R0_OK)
 					return status;
 
-				snprintf(cstring,50,"Position(rad) : %.2f \r\n",position);
+				snprintf(cstring,50,"\n Position(rad) : %.2f \r\n",position);
 
 				writePxMutex(Port,(char* )cstring,strlen((char* )cstring),
 				cmd500ms,HAL_MAX_DELAY);
@@ -601,7 +627,26 @@ Module_Status Exportstreamtoterminal(uint8_t Port,All_Data function,uint32_t Num
 					break;
 			}
 			break;
+		case MOD:
 
+			if(period > timeout)
+				timeout =period;
+
+			stopStream = false;
+
+			while((Numofsamples-- > 0) || (timeout >= MAX_MEMS_TIMEOUT_MS)){
+				pcOutputString =FreeRTOS_CLIGetOutputBuffer();
+				if((status =GetModeMotor(&mode)) != H19R0_OK)
+					return status;
+
+				snprintf(cstring,50,"\n Mode : %d \r\n",mode);
+
+				writePxMutex(Port,(char* )cstring,strlen((char* )cstring),
+				cmd500ms,HAL_MAX_DELAY);
+				if(PollingSleepCLISafe(period,Numofsamples) != H19R0_OK)
+					break;
+			}
+			break;
 		default:
 			status =H19R0_ERR_WrongParams;
 			break;
@@ -708,6 +753,12 @@ uint8_t SetSpeedMotor(uint16_t Time, int16_t Speed) {
 	return 0;
 }
 
+uint8_t GetModeMotor(uint8_t* Mode){
+	GetControlMode(Mode);
+
+	return 0;
+}
+
 /*-----------------------------------------------------------*/
 Module_Status SampletoPort(uint8_t module,uint8_t port,All_Data function){
 	Module_Status status =H19R0_OK;
@@ -773,6 +824,8 @@ Module_Status StreamToBuffer(float *buffer,All_Data function,uint32_t Numofsampl
 static portBASE_TYPE SampleMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLen,const int8_t *pcCommandString){
 	const char *const PosCmdName ="pos";
 
+	const char *const ModCmdName ="mod";
+
 
 	const char *pSensName = NULL;
 	portBASE_TYPE sensNameLen =0;
@@ -790,6 +843,10 @@ static portBASE_TYPE SampleMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBuffe
 	do{
 		if(!strncmp(pSensName,PosCmdName,strlen(PosCmdName))){
 			Exportstreamtoterminal(PcPort,POS,1,500);
+
+		}
+		else if(!strncmp(pSensName,ModCmdName,strlen(ModCmdName))){
+			Exportstreamtoterminal(PcPort,MOD,1,500);
 
 		}
 		else{
