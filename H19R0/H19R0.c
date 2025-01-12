@@ -60,6 +60,7 @@ void SamplePosBuff(float *buffer);
 /* Create CLI commands --------------------------------------------------------*/
 static portBASE_TYPE SampleMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
 static portBASE_TYPE StreamMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
+static portBASE_TYPE SetMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
 
 /* Private CLI functions */
 static Module_Status StreamToCLI(uint32_t Numofsamples,uint32_t timeout,SampleToString function);
@@ -71,6 +72,15 @@ const CLI_Command_Definition_t SampleCommandDefinition = {
 	(const int8_t *) "sample:\r\n Syntax: sample [Pos]/[Mod].\r\n\r\n",
 	SampleMotorCommand,
 	1
+};
+
+/*-----------------------------------------------------------*/
+/* CLI command structure : setval */
+const CLI_Command_Definition_t SetValCommandDefinition = {
+	(const int8_t *) "setval",
+	(const int8_t *) "setval:\r\n Syntax: setval [Pos]/[Spd] (val) .\r\n\r\n",
+	SetMotorCommand,
+	3
 };
 
 /*-----------------------------------------------------------*/
@@ -455,6 +465,7 @@ Module_Status Module_MessagingTask(uint16_t code, uint8_t port, uint8_t src, uin
 void RegisterModuleCLICommands(void) {
 	FreeRTOS_CLIRegisterCommand(&SampleCommandDefinition);
 	FreeRTOS_CLIRegisterCommand(&StreamCommandDefinition);
+	FreeRTOS_CLIRegisterCommand(&SetValCommandDefinition);
 }
 
 /*-----------------------------------------------------------*/
@@ -942,6 +953,40 @@ static portBASE_TYPE StreamMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBuffe
 	} while(0);
 
 	snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Error reading Sensor\r\n");
+	return pdFALSE;
+}
+
+/*-----------------------------------------------------------*/
+
+static portBASE_TYPE SetMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLen,const int8_t *pcCommandString){
+	const char *const PosCmdName ="pos";
+
+	const char *pSensName = NULL;
+	const char *pParamStr1 = NULL;
+	const char *pParamStr2 = NULL;
+
+	float pos;
+	float posTime;
+
+	portBASE_TYPE sensNameLen =0;
+	portBASE_TYPE paramStrLen1 =0;
+	portBASE_TYPE paramStrLen2 =0;
+
+
+	// Make sure we return something
+	*pcWriteBuffer ='\0';
+
+	pSensName =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,1,&sensNameLen);
+	pParamStr1 =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,2,&paramStrLen1);
+	pParamStr2 =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,3,&paramStrLen2);
+
+	pos =atof(pParamStr1);
+	posTime =atof(pParamStr2);
+
+	SetPositionMotor(pos, posTime);
+
+
+
 	return pdFALSE;
 }
 
