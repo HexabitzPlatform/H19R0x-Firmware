@@ -1034,12 +1034,18 @@ static portBASE_TYPE StreamMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBuffe
 static portBASE_TYPE SetMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLen,const int8_t *pcCommandString){
 	const char *const PosCmdName ="pos";
 
+	const char *const SpeedCmdName ="speed";
+
 	const char *pSensName = NULL;
 	const char *pParamStr1 = NULL;
 	const char *pParamStr2 = NULL;
 
 	float pos;
 	float posTime;
+
+	int16_t speed;
+	uint16_t speedTime;
+
 
 	portBASE_TYPE sensNameLen =0;
 	portBASE_TYPE paramStrLen1 =0;
@@ -1050,13 +1056,24 @@ static portBASE_TYPE SetMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLe
 	*pcWriteBuffer ='\0';
 
 	pSensName =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,1,&sensNameLen);
+
 	pParamStr1 =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,2,&paramStrLen1);
 	pParamStr2 =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,3,&paramStrLen2);
 
-	pos =atof(pParamStr1);
-	posTime =atof(pParamStr2);
+	if(!strncmp(pSensName,PosCmdName,strlen(PosCmdName)))
+	{
+		pos =atof(pParamStr1);
+		posTime =atof(pParamStr2);
+		SetPositionMotor(pos, posTime);
+	}
+	else if(!strncmp(pSensName,SpeedCmdName,strlen(SpeedCmdName)))
+	{
+		speed =(int16_t)atoi(pParamStr1);
+		speedTime =(uint16_t)atoi(pParamStr2);
+		SetSpeedMotor(speedTime, speed);
+	}
 
-	SetPositionMotor(pos, posTime);
+
 
 
 
