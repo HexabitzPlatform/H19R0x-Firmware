@@ -288,7 +288,7 @@ uint8_t SetTorque(uint16_t Time, int16_t Torque) {
  *   */
 uint8_t GetMoveDuration(float *Duration) {
 	ReceiveMessage();
-	PrepareMessage(GET_MOVE_DURATON);
+	PrepareMessage(GET_MOVE_DURATION);
 	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
 	while (1) {
 
@@ -299,7 +299,7 @@ uint8_t GetMoveDuration(float *Duration) {
 	}
 	uint8_t command;
 	ProcessReceivedCommand(&command);
-	if (command == GET_MOVE_DURATON) {
+	if (command == GET_MOVE_DURATION) {
 		ProcessReceivedFloat(FirstBytesRevdMSG, Duration);
 	}
 

@@ -33,7 +33,7 @@ typedef enum {
 	GET_SPEED,
 	GET_POSITION,
 	GET_CONTROL_MODE,
-	GET_MOVE_DURATON
+	GET_MOVE_DURATION,
 } Command_Status;
 
 
