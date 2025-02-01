@@ -97,7 +97,7 @@
 
 /* Choose the functionality of stream and sample APIs */
 typedef enum {
-	POS =0, MOD,
+	POS =0, MOD, MOV_DURATION,
 } All_Data;
 
 /* Module_Status Type Definition */
@@ -156,6 +156,13 @@ uint8_t SetPositionMotor(float Position, float Duration);
  *  	get position from initial position in radian
  *   */
 uint8_t GetPositionMotor(float *Position);
+
+/**********************************************************************/
+
+/**
+ * @brief returns the last move duration of Motor 1 in seconds.
+ *   */
+uint8_t GetMoveDurationMotor(float *MoveDuration);
 
 /**********************************************************************/
 /**

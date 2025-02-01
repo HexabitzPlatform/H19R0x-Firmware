@@ -69,7 +69,7 @@ void SamplePosToString(char *cstring,size_t maxLen);
 /* CLI command structure : sample */
 const CLI_Command_Definition_t SampleCommandDefinition = {
 	(const int8_t *) "sample",
-	(const int8_t *) "sample:\r\n Syntax: sample [Pos]/[Mod].\r\n\r\n",
+	(const int8_t *) "sample:\r\n Syntax: sample [Pos]/[Mod]/[MVDuration].\r\n\r\n",
 	SampleMotorCommand,
 	1
 };
@@ -515,7 +515,7 @@ void BLDCTask(void *argument) {
 /*-----------------------------------------------------------*/
 Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function) {
 
-	float position;
+	float position, movDuration;
 	uint8_t mode;
 	static uint8_t temp[4] = { 0 };
 	Module_Status status = H19R0_OK;
@@ -547,6 +547,37 @@ Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function) {
 			messageParams[4] = (uint8_t) ((*(uint32_t*) &position) >> 8);
 			messageParams[5] = (uint8_t) ((*(uint32_t*) &position) >> 16);
 			messageParams[6] = (uint8_t) ((*(uint32_t*) &position) >> 24);
+
+			SendMessageToModule(module, CODE_READ_RESPONSE,
+					(sizeof(float) * 1) + 3);
+		}
+		break;
+	case MOV_DURATION:
+
+		if ((status = GetMoveDurationMotor(&movDuration)) != H19R0_OK)
+			return status = H19R0_ERROR;
+
+		if (module == myID || module == 0) {
+			temp[0] =(uint8_t )((*(uint32_t* )&movDuration) >> 0);
+			temp[1] =(uint8_t )((*(uint32_t* )&movDuration) >> 8);
+			temp[2] =(uint8_t )((*(uint32_t* )&movDuration) >> 16);
+			temp[3] =(uint8_t )((*(uint32_t* )&movDuration) >> 24);
+
+			writePxITMutex(port, (char*) &temp[0], 4* sizeof(uint8_t), 10);
+		}
+		else {
+			/* LSB first */
+			if (H19R0_OK == status)
+				messageParams[1] = BOS_OK;
+			else
+				messageParams[1] = BOS_ERROR;
+
+			messageParams[0] = FMT_FLOAT;
+			messageParams[2] = 1;
+			messageParams[3] = (uint8_t) ((*(uint32_t*) &movDuration) >> 0);
+			messageParams[4] = (uint8_t) ((*(uint32_t*) &movDuration) >> 8);
+			messageParams[5] = (uint8_t) ((*(uint32_t*) &movDuration) >> 16);
+			messageParams[6] = (uint8_t) ((*(uint32_t*) &movDuration) >> 24);
 
 			SendMessageToModule(module, CODE_READ_RESPONSE,
 					(sizeof(float) * 1) + 3);
@@ -610,7 +641,7 @@ Module_Status Exportstreamtoterminal(uint8_t Port,All_Data function,uint32_t Num
 	int8_t *pcOutputString = NULL;
 	uint32_t period =timeout / Numofsamples;
 	char cstring[100];
-	float position =0;
+	float position =0, moveDuration;
 	uint8_t mode = 0;
 
 	if(period < MIN_MEMS_PERIOD_MS)
@@ -631,6 +662,26 @@ Module_Status Exportstreamtoterminal(uint8_t Port,All_Data function,uint32_t Num
 					return status;
 
 				snprintf(cstring,50,"\n Position(rad) : %.2f \r\n",position);
+
+				writePxMutex(Port,(char* )cstring,strlen((char* )cstring),
+				cmd500ms,HAL_MAX_DELAY);
+				if(PollingSleepCLISafe(period,Numofsamples) != H19R0_OK)
+					break;
+			}
+			break;
+		case MOV_DURATION:
+
+			if(period > timeout)
+				timeout =period;
+
+			stopStream = false;
+
+			while((Numofsamples-- > 0) || (timeout >= MAX_MEMS_TIMEOUT_MS)){
+				pcOutputString =FreeRTOS_CLIGetOutputBuffer();
+				if((status =GetMoveDurationMotor(&moveDuration)) != H19R0_OK)
+					return status;
+
+				snprintf(cstring,50,"\n Move duration(sec) : %.2f \r\n",moveDuration);
 
 				writePxMutex(Port,(char* )cstring,strlen((char* )cstring),
 				cmd500ms,HAL_MAX_DELAY);
@@ -732,6 +783,13 @@ void SamplePosBuff(float *buffer){
 	*buffer =Pos;
 }
 
+/*-----------------------------------------------------------*/
+void SampleMovDurationBuff(float *buffer){
+	float MovDuration;
+	GetMoveDurationMotor(&MovDuration);
+	*buffer =MovDuration;
+}
+
 /* -----------------------------------------------------------------------
  |                               APIs                                    |
  -----------------------------------------------------------------------
@@ -753,6 +811,12 @@ uint8_t SetPositionMotor(float Position, float Duration) {
 
 uint8_t GetPositionMotor(float *Position){
 	GetPosition(Position);
+
+	return 0;
+}
+
+uint8_t GetMoveDurationMotor(float *MoveDuration){
+	GetMoveDuration(MoveDuration);
 
 	return 0;
 }
@@ -822,6 +886,9 @@ Module_Status StreamToBuffer(float *buffer,All_Data function,uint32_t Numofsampl
 		case POS:
 			return StreamMemsToBuf(buffer,Numofsamples,timeout,SamplePosBuff);
 			break;
+		case MOV_DURATION:
+			return StreamMemsToBuf(buffer,Numofsamples,timeout,SampleMovDurationBuff);
+			break;
 		default:
 			break;
 	}
@@ -834,6 +901,8 @@ Module_Status StreamToBuffer(float *buffer,All_Data function,uint32_t Numofsampl
  */
 static portBASE_TYPE SampleMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLen,const int8_t *pcCommandString){
 	const char *const PosCmdName ="pos";
+
+	const char *const MvDurationCmdName ="mvduration";
 
 	const char *const ModCmdName ="mod";
 
@@ -854,6 +923,10 @@ static portBASE_TYPE SampleMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBuffe
 	do{
 		if(!strncmp(pSensName,PosCmdName,strlen(PosCmdName))){
 			Exportstreamtoterminal(PcPort,POS,1,500);
+
+		}
+		else if(!strncmp(pSensName,MvDurationCmdName,strlen(MvDurationCmdName))){
+			Exportstreamtoterminal(PcPort,MOV_DURATION,1,500);
 
 		}
 		else if(!strncmp(pSensName,ModCmdName,strlen(ModCmdName))){
