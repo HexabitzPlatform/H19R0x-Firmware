@@ -78,7 +78,7 @@ const CLI_Command_Definition_t SampleCommandDefinition = {
 /* CLI command structure : setval */
 const CLI_Command_Definition_t SetValCommandDefinition = {
 	(const int8_t *) "setval",
-	(const int8_t *) "setval:\r\n Syntax: setval [Pos]/[Spd] (val) .\r\n\r\n",
+	(const int8_t *) "setval:\r\n Syntax: setval [Pos]/[Speed]/[Torque] (val) .\r\n\r\n",
 	SetMotorCommand,
 	3
 };
@@ -828,6 +828,13 @@ uint8_t SetSpeedMotor(uint16_t Time, int16_t Speed) {
 	return 0;
 }
 
+uint8_t SetTorqueMotor(uint16_t Time, int16_t Torque) {
+
+	SetTorque(Time, Torque);
+
+	return 0;
+}
+
 uint8_t GetModeMotor(uint8_t* Mode){
 	GetControlMode(Mode);
 
@@ -1036,6 +1043,8 @@ static portBASE_TYPE SetMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLe
 
 	const char *const SpeedCmdName ="speed";
 
+	const char *const TorqueCmdName ="torque";
+
 	const char *pSensName = NULL;
 	const char *pParamStr1 = NULL;
 	const char *pParamStr2 = NULL;
@@ -1045,6 +1054,9 @@ static portBASE_TYPE SetMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLe
 
 	int16_t speed;
 	uint16_t speedTime;
+
+	int16_t torque;
+	uint16_t torqueTime;
 
 
 	portBASE_TYPE sensNameLen =0;
@@ -1072,12 +1084,14 @@ static portBASE_TYPE SetMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLe
 		speedTime =(uint16_t)atoi(pParamStr2);
 		SetSpeedMotor(speedTime, speed);
 	}
+	else if(!strncmp(pSensName,TorqueCmdName,strlen(TorqueCmdName)))
+	{
+		torque =(int16_t)atoi(pParamStr1);
+		torqueTime =(uint16_t)atoi(pParamStr2);
+		SetTorqueMotor(torqueTime, torque);
+	}
 
-
-
-
-
-	return pdFALSE;
+    return pdFALSE;
 }
 
 

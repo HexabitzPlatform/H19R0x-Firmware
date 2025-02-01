@@ -174,7 +174,15 @@ uint8_t GetMoveDurationMotor(float *MoveDuration);
  */
 uint8_t SetSpeedMotor(uint16_t Time, int16_t Speed);
 
-
+/**********************************************************************/
+/**
+ * @brief Programs a torque command for Motor in the given @p Duration Time.
+ *
+ * @param  Mechanical motor torque reference at the end of the ramp.
+  *         This value represents actually the Iq current expressed in digit.
+ * @param  Duration of the movement expressed in ms.
+ */
+uint8_t SetTorqueMotor(uint16_t Time, int16_t Torque)
 
 uint8_t GetModeMotor(uint8_t* Mode);
 Module_Status SampletoPort(uint8_t module,uint8_t port,All_Data function);
