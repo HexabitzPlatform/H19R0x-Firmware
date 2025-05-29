@@ -332,6 +332,28 @@ uint8_t GetControlMode(uint8_t* Mode)
 	return 0;
 }
 
+/**********************************************************************/
+/**
+ * @brief Programs a torque command for Motor in the given @p Duration Time.
+ *
+ * @param  Mechanical motor torque reference at the end of the ramp.
+  *         This value represents actually the Iq current expressed in digit.
+ * @param  Duration of the movement expressed in ms.
+ */
+uint8_t StopRampCommand() {
+	FirstBytesSentMSG[0] = 0;
+	FirstBytesSentMSG[1] = 0;
+	FirstBytesSentMSG[2] = 0;
+	FirstBytesSentMSG[3] = 0;
+
+	SecondBytesSentMSG[0] = 0;
+	SecondBytesSentMSG[1] = 0;
+	SecondBytesSentMSG[2] = 0;
+	SecondBytesSentMSG[3] = 0;
+	PrepareMessage(STOP_RAMP_COMMAND);
+	HAL_UART_Transmit_IT(&huart1, SendingMessage, 11);
+}
+
 uint8_t Test_Function() {
 	return 0;
 }

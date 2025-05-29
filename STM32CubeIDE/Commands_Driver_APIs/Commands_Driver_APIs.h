@@ -34,6 +34,10 @@ typedef enum {
 	GET_POSITION,
 	GET_CONTROL_MODE,
 	GET_MOVE_DURATION,
+	CHECK_STATUS_CONTROL_POSITION,
+	GET_STATUS_MOTOR,
+	STOP_RAMP_COMMAND,
+	HAS_RAMP_COMPLETED
 } Command_Status;
 
 
@@ -49,6 +53,7 @@ uint8_t SetSpeed(uint16_t Time, int16_t Speed);
 uint8_t SetTorque(uint16_t Time, int16_t Torque);
 uint8_t GetMoveDuration(float* Duration);
 uint8_t GetControlMode(uint8_t* Mode);
+uint8_t StopRampCommand();
 uint8_t Test_Function();
 
 #ifdef __cplusplus

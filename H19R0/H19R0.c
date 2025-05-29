@@ -841,6 +841,12 @@ uint8_t GetModeMotor(uint8_t* Mode){
 	return 0;
 }
 
+uint8_t StopRampCommandMotor(){
+	StopRampCommand();
+
+	return 0;
+}
+
 /*-----------------------------------------------------------*/
 Module_Status SampletoPort(uint8_t module,uint8_t port,All_Data function){
 	Module_Status status =H19R0_OK;
@@ -1045,6 +1051,8 @@ static portBASE_TYPE SetMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLe
 
 	const char *const TorqueCmdName ="torque";
 
+	const char *const StopRampCmdName ="stopramp";
+
 	const char *pSensName = NULL;
 	const char *pParamStr1 = NULL;
 	const char *pParamStr2 = NULL;
@@ -1089,6 +1097,10 @@ static portBASE_TYPE SetMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLe
 		torque =(int16_t)atoi(pParamStr1);
 		torqueTime =(uint16_t)atoi(pParamStr2);
 		SetTorqueMotor(torqueTime, torque);
+	}
+	else if(!strncmp(pSensName,StopRampCmdName,strlen(StopRampCmdName)))
+	{
+		StopRampCommandMotor();
 	}
 
     return pdFALSE;
