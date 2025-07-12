@@ -442,20 +442,20 @@ uint8_t ClearROtopology(void) {
  */
 Module_Status Module_MessagingTask(uint16_t code, uint8_t port, uint8_t src, uint8_t dst, uint8_t shift)
 {
-  Module_Status result = H19R0_OK;
-
-  switch (code)
-  {
-	case CODE_H19R0_SAMPLE_POS: {
-		Exporttoport(cMessage[port - 1][shift], cMessage[port - 1][1 + shift],POS);
-		break;
-	}
-	default:
-		result = H19R0_ERR_UnknownMessage;
-		break;
-  }
-
-  return result;
+//  Module_Status result = H19R0_OK;
+//
+//  switch (code)
+//  {
+//	case CODE_H19R0_SAMPLE_POS: {
+//		Exporttoport(cMessage[port - 1][shift], cMessage[port - 1][1 + shift],POS);
+//		break;
+//	}
+//	default:
+//		result = H19R0_ERR_UnknownMessage;
+//		break;
+//  }
+//
+//  return result;
 }
 
 /*-----------------------------------------------------------*/
@@ -793,59 +793,85 @@ void SampleMovDurationBuff(float *buffer){
 /* -----------------------------------------------------------------------
  |                               APIs                                    |
  -----------------------------------------------------------------------
+
+/* Stop the motor */
+Module_Status StopMotor(void) {
+    Stop();
+    return H19R0_OK;
+}
+
+
+/******************************************************************************/
+/* Set motor target position with movement duration
+ * Position: target position in user-defined units
+ * Duration: movement time
  */
-uint8_t StopMotor() {
-
-	Stop();
-
-	return 0;
-}
-
-uint8_t SetPositionMotor(float Position, float Duration) {
-
-	SetPosition(Position, Duration);
-
-	return 0;
+Module_Status SetPositionMotor(float Position, float Duration) {
+    SetPosition(Position, Duration);
+    return H19R0_OK;
 }
 
 
-uint8_t GetPositionMotor(float *Position){
-	GetPosition(Position);
-
-	return 0;
+/******************************************************************************/
+/* Get the current position of the motor
+ * Position: pointer to store the current position
+ */
+Module_Status GetPositionMotor(float *Position) {
+    GetPosition(Position);
+    return H19R0_OK;
 }
 
-uint8_t GetMoveDurationMotor(float *MoveDuration){
-	GetMoveDuration(MoveDuration);
 
-	return 0;
+/******************************************************************************/
+/* Get the remaining move duration
+ * MoveDuration: pointer to store the remaining duration
+ */
+Module_Status GetMoveDurationMotor(float *MoveDuration) {
+    GetMoveDuration(MoveDuration);
+    return H19R0_OK;
 }
 
-uint8_t SetSpeedMotor(uint16_t Time, int16_t Speed) {
 
-	SetSpeed(Time, Speed);
-
-	return 0;
+/******************************************************************************/
+/* Set motor speed for a given duration
+ * Time: time in ms or user-defined units
+ * Speed: target speed value
+ */
+Module_Status SetSpeedMotor(uint16_t Time, int16_t Speed) {
+    SetSpeed(Time, Speed);
+    return H19R0_OK;
 }
 
-uint8_t SetTorqueMotor(uint16_t Time, int16_t Torque) {
 
-	SetTorque(Time, Torque);
-
-	return 0;
+/******************************************************************************/
+/* Set motor torque for a given duration
+ * Time: time in ms or user-defined units
+ * Torque: target torque value
+ */
+Module_Status SetTorqueMotor(uint16_t Time, int16_t Torque) {
+    SetTorque(Time, Torque);
+    return H19R0_OK;
 }
 
-uint8_t GetModeMotor(uint8_t* Mode){
-	GetControlMode(Mode);
 
-	return 0;
+/******************************************************************************/
+/* Get current control mode of the motor
+ * Mode: pointer to store current control mode
+ */
+Module_Status GetModeMotor(uint8_t* Mode) {
+    GetControlMode(Mode);
+    return H19R0_OK;
 }
 
-uint8_t StopRampCommandMotor(){
-	StopRampCommand();
 
-	return 0;
+/******************************************************************************/
+/* Stop current torque/speed ramp command */
+Module_Status StopRampCommandMotor(void) {
+    StopRampCommand();
+    return H19R0_OK;
 }
+
+
 
 /*-----------------------------------------------------------*/
 Module_Status SampletoPort(uint8_t module,uint8_t port,All_Data function){
