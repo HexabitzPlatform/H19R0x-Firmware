@@ -58,39 +58,56 @@ static Module_Status PollingSleepCLISafe(uint32_t period,long Numofsamples);
 static Module_Status StreamMemsToBuf(float *buffer,uint32_t Numofsamples,uint32_t timeout,SampleMemsToBuffer function);
 void SamplePosBuff(float *buffer);
 /* Create CLI commands --------------------------------------------------------*/
-static portBASE_TYPE SampleMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
-static portBASE_TYPE StreamMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
-static portBASE_TYPE SetMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
+/* CLI command functions ****************************************************/
+static portBASE_TYPE CLI_StopMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
+static portBASE_TYPE CLI_SetPositionMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
+static portBASE_TYPE CLI_SetSpeedMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
+static portBASE_TYPE CLI_SetTorqueMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
 
+/***************************************************************************/
 /* Private CLI functions */
 static Module_Status StreamToCLI(uint32_t Numofsamples,uint32_t timeout,SampleToString function);
-void SamplePosToString(char *cstring,size_t maxLen);
-/*-----------------------------------------------------------*/
-/* CLI command structure : sample */
-const CLI_Command_Definition_t SampleCommandDefinition = {
-	(const int8_t *) "sample",
-	(const int8_t *) "sample:\r\n Syntax: sample [Pos]/[Mod]/[MVDuration].\r\n\r\n",
-	SampleMotorCommand,
-	1
+void SamplePosToString(char *cstring,size_t maxLen);/* CLI command: stop_motor */
+const CLI_Command_Definition_t CLI_StopMotorCommandDefinition = {
+    (const int8_t *)"stop_motor",
+    (const int8_t *)"stop_motor : Stop the motor immediately\n\r\n",
+    CLI_StopMotorCommand,
+    0
 };
 
-/*-----------------------------------------------------------*/
-/* CLI command structure : setval */
-const CLI_Command_Definition_t SetValCommandDefinition = {
-	(const int8_t *) "setval",
-	(const int8_t *) "setval:\r\n Syntax: setval [Pos]/[Speed]/[Torque] (val) .\r\n\r\n",
-	SetMotorCommand,
-	3
+/***************************************************************************/
+/* CLI command: set_position */
+const CLI_Command_Definition_t CLI_SetPositionMotorCommandDefinition = {
+    (const int8_t *)"set_position",
+    (const int8_t *)"set_position : Set motor target position\n\r"
+                    " 1) Position (float)\n\r"
+                    " 2) Duration (float)\n\r\n",
+    CLI_SetPositionMotorCommand,
+    2
 };
 
-/*-----------------------------------------------------------*/
-/* CLI command structure : stream */
-const CLI_Command_Definition_t StreamCommandDefinition = {
-	(const int8_t *) "stream",
-	(const int8_t *) "stream:\r\n Syntax: stream [Pos]/[Mod] ( Numofsamples ) (timeout) .\r\n\r\n",
-	StreamMotorCommand,
-	-1
+/***************************************************************************/
+/* CLI command: set_speed */
+const CLI_Command_Definition_t CLI_SetSpeedMotorCommandDefinition = {
+    (const int8_t *)"set_speed",
+    (const int8_t *)"set_speed : Set motor speed for a specific duration\n\r"
+                    " 1) Time (ms)\n\r"
+                    " 2) Speed (int)\n\r\n",
+    CLI_SetSpeedMotorCommand,
+    2
 };
+
+/***************************************************************************/
+/* CLI command: set_torque */
+const CLI_Command_Definition_t CLI_SetTorqueMotorCommandDefinition = {
+    (const int8_t *)"set_torque",
+    (const int8_t *)"set_torque : Set motor torque for a specific duration\n\r"
+                    " 1) Time (ms)\n\r"
+                    " 2) Torque (int)\n\r\n",
+    CLI_SetTorqueMotorCommand,
+    2
+};
+
 /*-----------------------------------------------------------*/
 /* CLI command structure : streamtcli */
 /*-----------------------------------------------------------*/
@@ -463,9 +480,10 @@ Module_Status Module_MessagingTask(uint16_t code, uint8_t port, uint8_t src, uin
 /* --- Register this module CLI Commands
  */
 void RegisterModuleCLICommands(void) {
-	FreeRTOS_CLIRegisterCommand(&SampleCommandDefinition);
-	FreeRTOS_CLIRegisterCommand(&StreamCommandDefinition);
-	FreeRTOS_CLIRegisterCommand(&SetValCommandDefinition);
+	FreeRTOS_CLIRegisterCommand(&CLI_StopMotorCommandDefinition);
+	FreeRTOS_CLIRegisterCommand(&CLI_SetPositionMotorCommandDefinition);
+	FreeRTOS_CLIRegisterCommand(&CLI_SetSpeedMotorCommandDefinition);
+	FreeRTOS_CLIRegisterCommand(&CLI_SetTorqueMotorCommandDefinition);
 }
 
 /*-----------------------------------------------------------*/
@@ -938,196 +956,115 @@ Module_Status StreamToBuffer(float *buffer,All_Data function,uint32_t Numofsampl
  |                             Commands                                  |
  -----------------------------------------------------------------------
  */
-static portBASE_TYPE SampleMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLen,const int8_t *pcCommandString){
-	const char *const PosCmdName ="pos";
+portBASE_TYPE CLI_StopMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString) {
 
-	const char *const MvDurationCmdName ="mvduration";
+	    Module_Status status = H19R0_OK;
 
-	const char *const ModCmdName ="mod";
+	    static const int8_t *pcOKMessage = (int8_t *)"Motor stopped successfully.\n\r";
 
+	    (void)xWriteBufferLen;
+	    configASSERT(pcWriteBuffer);
 
-	const char *pSensName = NULL;
-	portBASE_TYPE sensNameLen =0;
+	    status = StopMotor();
 
-	// Make sure we return something
-	*pcWriteBuffer ='\0';
+	    if (status == H19R0_OK)
+	        strcpy((char *)pcWriteBuffer, (char *)pcOKMessage);
+	    else
+	        strcpy((char *)pcWriteBuffer, (char *)"Failed to stop motor.\n\r");
 
-	pSensName =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,1,&sensNameLen);
-
-	if(pSensName == NULL){
-		snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Invalid Arguments\r\n");
-		return pdFALSE;
+	    return pdFALSE;
 	}
 
-	do{
-		if(!strncmp(pSensName,PosCmdName,strlen(PosCmdName))){
-			Exportstreamtoterminal(PcPort,POS,1,500);
 
-		}
-		else if(!strncmp(pSensName,MvDurationCmdName,strlen(MvDurationCmdName))){
-			Exportstreamtoterminal(PcPort,MOV_DURATION,1,500);
+/*-----------------------------------------------------------*/
+portBASE_TYPE CLI_SetPositionMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString) {
+    Module_Status status = H19R0_OK;
 
-		}
-		else if(!strncmp(pSensName,ModCmdName,strlen(ModCmdName))){
-			Exportstreamtoterminal(PcPort,MOD,1,500);
+    portBASE_TYPE xParamLen1 = 0, xParamLen2 = 0;
+    static int8_t *param1, *param2;
+    float position = 0.0f, duration = 0.0f;
 
-		}
-		else{
-			snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Invalid Arguments\r\n");
-		}
+    static const int8_t *pcOKMessage = (int8_t *)"Position set to %.2f over %.2f seconds.\n\r";
+    static const int8_t *pcErrorMessage = (int8_t *)"Invalid parameters for position.\n\r";
 
-		return pdFALSE;
-	} while(0);
+    (void)xWriteBufferLen;
+    configASSERT(pcWriteBuffer);
 
-	snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Error reading Sensor\r\n");
-	return pdFALSE;
+    param1 = (int8_t *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen1);
+    param2 = (int8_t *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen2);
+
+    position = strtof((char *)param1, NULL);
+    duration = strtof((char *)param2, NULL);
+
+    status = SetPositionMotor(position, duration);
+
+    if (status == H19R0_OK)
+        sprintf((char *)pcWriteBuffer, (char *)pcOKMessage, position, duration);
+    else
+        strcpy((char *)pcWriteBuffer, (char *)pcErrorMessage);
+
+    return pdFALSE;
+}
+
+
+/*-----------------------------------------------------------*/
+portBASE_TYPE CLI_SetSpeedMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString) {
+    Module_Status status = H19R0_OK;
+
+    portBASE_TYPE xParamLen1 = 0, xParamLen2 = 0;
+    static int8_t *param1, *param2;
+    uint16_t time = 0;
+    int16_t speed = 0;
+
+    static const int8_t *pcOKMessage = (int8_t *)"Speed set to %d for %d ms.\n\r";
+    static const int8_t *pcErrorMessage = (int8_t *)"Invalid parameters for speed.\n\r";
+
+    (void)xWriteBufferLen;
+    configASSERT(pcWriteBuffer);
+
+    param1 = (int8_t *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen1);
+    param2 = (int8_t *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen2);
+
+    time = (uint16_t)atoi((char *)param1);
+    speed = (int16_t)atoi((char *)param2);
+
+    status = SetSpeedMotor(time, speed);
+
+    if (status == H19R0_OK)
+        sprintf((char *)pcWriteBuffer, (char *)pcOKMessage, speed, time);
+    else
+        strcpy((char *)pcWriteBuffer, (char *)pcErrorMessage);
+
+    return pdFALSE;
 }
 
 /*-----------------------------------------------------------*/
-// Port Mode => false and CLI Mode => true
-static bool StreamCommandParser(const int8_t *pcCommandString,const char **ppSensName,portBASE_TYPE *pSensNameLen,
-bool *pPortOrCLI,uint32_t *pPeriod,uint32_t *pTimeout,uint8_t *pPort,uint8_t *pModule){
-	const char *pPeriodMSStr = NULL;
-	const char *pTimeoutMSStr = NULL;
+portBASE_TYPE CLI_SetTorqueMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString) {
+    Module_Status status = H19R0_OK;
 
-	portBASE_TYPE periodStrLen =0;
-	portBASE_TYPE timeoutStrLen =0;
+    portBASE_TYPE xParamLen1 = 0, xParamLen2 = 0;
+    static int8_t *param1, *param2;
+    uint16_t time = 0;
+    int16_t torque = 0;
 
-	const char *pPortStr = NULL;
-	const char *pModStr = NULL;
+    static const int8_t *pcOKMessage = (int8_t *)"Torque set to %d for %d ms.\n\r";
+    static const int8_t *pcErrorMessage = (int8_t *)"Invalid parameters for torque.\n\r";
 
-	portBASE_TYPE portStrLen =0;
-	portBASE_TYPE modStrLen =0;
+    (void)xWriteBufferLen;
+    configASSERT(pcWriteBuffer);
 
-	*ppSensName =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,1,pSensNameLen);
-	pPeriodMSStr =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,2,&periodStrLen);
-	pTimeoutMSStr =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,3,&timeoutStrLen);
+    param1 = (int8_t *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen1);
+    param2 = (int8_t *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen2);
 
-	// At least 3 Parameters are required!
-	if((*ppSensName == NULL) || (pPeriodMSStr == NULL) || (pTimeoutMSStr == NULL))
-		return false;
+    time = (uint16_t)atoi((char *)param1);
+    torque = (int16_t)atoi((char *)param2);
 
-	// TODO: Check if Period and Timeout are integers or not!
-	*pPeriod =atoi(pPeriodMSStr);
-	*pTimeout =atoi(pTimeoutMSStr);
-	*pPortOrCLI = true;
+    status = SetTorqueMotor(time, torque);
 
-	pPortStr =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,4,&portStrLen);
-	pModStr =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,5,&modStrLen);
-
-	if((pModStr == NULL) && (pPortStr == NULL))
-		return true;
-	if((pModStr == NULL) || (pPortStr == NULL))	// If user has provided 4 Arguments.
-		return false;
-
-	*pPort =atoi(pPortStr);
-	*pModule =atoi(pModStr);
-	*pPortOrCLI = false;
-
-	return true;
-}
-
-/*-----------------------------------------------------------*/
-static portBASE_TYPE StreamMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLen,const int8_t *pcCommandString){
-	const char *const PosCmdName ="pos";
-
-	uint32_t Numofsamples =0;
-	uint32_t timeout =0;
-	uint8_t port =0;
-	uint8_t module =0;
-
-	bool portOrCLI = true; // Port Mode => false and CLI Mode => true
-
-	const char *pSensName = NULL;
-	portBASE_TYPE sensNameLen =0;
-
-	// Make sure we return something
-	*pcWriteBuffer ='\0';
-
-	if(!StreamCommandParser(pcCommandString,&pSensName,&sensNameLen,&portOrCLI,&Numofsamples,&timeout,&port,&module)){
-		snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Invalid Arguments\r\n");
-		return pdFALSE;
-	}
-
-	do{
-		if(!strncmp(pSensName,PosCmdName,strlen(PosCmdName))){
-			if(portOrCLI){
-				StreamToCLI(Numofsamples,timeout,SamplePosToString);
-			}
-
-		}
-		else{
-			snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Invalid Arguments\r\n");
-		}
-
-		snprintf((char* )pcWriteBuffer,xWriteBufferLen,"\r\n");
-		return pdFALSE;
-	} while(0);
-
-	snprintf((char* )pcWriteBuffer,xWriteBufferLen,"Error reading Sensor\r\n");
-	return pdFALSE;
-}
-
-/*-----------------------------------------------------------*/
-
-static portBASE_TYPE SetMotorCommand(int8_t *pcWriteBuffer,size_t xWriteBufferLen,const int8_t *pcCommandString){
-	const char *const PosCmdName ="pos";
-
-	const char *const SpeedCmdName ="speed";
-
-	const char *const TorqueCmdName ="torque";
-
-	const char *const StopRampCmdName ="stopramp";
-
-	const char *pSensName = NULL;
-	const char *pParamStr1 = NULL;
-	const char *pParamStr2 = NULL;
-
-	float pos;
-	float posTime;
-
-	int16_t speed;
-	uint16_t speedTime;
-
-	int16_t torque;
-	uint16_t torqueTime;
-
-
-	portBASE_TYPE sensNameLen =0;
-	portBASE_TYPE paramStrLen1 =0;
-	portBASE_TYPE paramStrLen2 =0;
-
-
-	// Make sure we return something
-	*pcWriteBuffer ='\0';
-
-	pSensName =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,1,&sensNameLen);
-
-	pParamStr1 =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,2,&paramStrLen1);
-	pParamStr2 =(const char* )FreeRTOS_CLIGetParameter(pcCommandString,3,&paramStrLen2);
-
-	if(!strncmp(pSensName,PosCmdName,strlen(PosCmdName)))
-	{
-		pos =atof(pParamStr1);
-		posTime =atof(pParamStr2);
-		SetPositionMotor(pos, posTime);
-	}
-	else if(!strncmp(pSensName,SpeedCmdName,strlen(SpeedCmdName)))
-	{
-		speed =(int16_t)atoi(pParamStr1);
-		speedTime =(uint16_t)atoi(pParamStr2);
-		SetSpeedMotor(speedTime, speed);
-	}
-	else if(!strncmp(pSensName,TorqueCmdName,strlen(TorqueCmdName)))
-	{
-		torque =(int16_t)atoi(pParamStr1);
-		torqueTime =(uint16_t)atoi(pParamStr2);
-		SetTorqueMotor(torqueTime, torque);
-	}
-	else if(!strncmp(pSensName,StopRampCmdName,strlen(StopRampCmdName)))
-	{
-		StopRampCommandMotor();
-	}
+    if (status == H19R0_OK)
+        sprintf((char *)pcWriteBuffer, (char *)pcOKMessage, torque, time);
+    else
+        strcpy((char *)pcWriteBuffer, (char *)pcErrorMessage);
 
     return pdFALSE;
 }
