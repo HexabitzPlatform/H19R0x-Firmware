@@ -14,6 +14,13 @@
  >> GPIOA 5 for ToF shutdown (XSHUT).
 
  */
+#define CODE_H19R0_TURN_ON        0x01
+#define CODE_H19R0_TURN_OFF       0x02
+#define CODE_H19R0_TURN_PWM       0x03
+#define CODE_H19R0_STOP           0x04
+#define CODE_H19R0_SET_POSITION   0x05
+#define CODE_H19R0_SET_SPEED      0x06
+#define CODE_H19R0_SET_TORQUE     0x07
 
 /* Includes ------------------------------------------------------------------*/
 #include "BOS.h"
@@ -458,21 +465,50 @@ uint8_t ClearROtopology(void) {
 /* --- H19R0 message processing task.
  */
 Module_Status Module_MessagingTask(uint16_t code, uint8_t port, uint8_t src, uint8_t dst, uint8_t shift)
-{
-//  Module_Status result = H19R0_OK;
-//
-//  switch (code)
-//  {
-//	case CODE_H19R0_SAMPLE_POS: {
-//		Exporttoport(cMessage[port - 1][shift], cMessage[port - 1][1 + shift],POS);
-//		break;
-//	}
-//	default:
-//		result = H19R0_ERR_UnknownMessage;
-//		break;
-//  }
-//
-//  return result;
+ {Module_Status result = H19R0_OK;
+
+ uint8_t direction = 0;
+ uint8_t motor = 0;
+ uint8_t dutyCycle = 0;
+ float position = 0.0f;
+ float duration = 0.0f;
+ uint16_t time = 0;
+ int16_t value = 0;
+
+ switch (code) {
+
+ 	/* Stop motor */
+ 	case CODE_H19R0_STOP:
+ 		result = StopMotor();
+ 		break;
+
+ 	/* Set position */
+ 	case CODE_H19R0_SET_POSITION:
+ 		position = *(float *)&cMessage[port - 1][shift];
+ 		duration = *(float *)&cMessage[port - 1][shift + 4];
+ 		result = SetPositionMotor(position, duration);
+ 		break;
+
+ 	/* Set speed */
+ 	case CODE_H19R0_SET_SPEED:
+ 		time  = *(uint16_t *)&cMessage[port - 1][shift];
+ 		value = *(int16_t *)&cMessage[port - 1][shift + 2];
+ 		result = SetSpeedMotor(time, value);
+ 		break;
+
+ 	/* Set torque */
+ 	case CODE_H19R0_SET_TORQUE:
+ 		time  = *(uint16_t *)&cMessage[port - 1][shift];
+ 		value = *(int16_t *)&cMessage[port - 1][shift + 2];
+ 		result = SetTorqueMotor(time, value);
+ 		break;
+
+ 	default:
+ 		result = H19R0_ERR_UnknownMessage;
+ 		break;
+ }
+
+ return result;
 }
 
 /*-----------------------------------------------------------*/
