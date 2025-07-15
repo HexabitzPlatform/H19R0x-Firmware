@@ -27,10 +27,13 @@ int main(void){
 /***************************************************************************/
 /* User Task */
 void UserTask(void *argument){
-
+//	MotorSetTorque(1000, 100);
+//		HAL_Delay(100);
 	/* put your code here, to run repeatedly. */
 	while(1){
-
+//		MotorMoveToAngle(10, 0.2);
+////		MotorSpeedControl(2000, 750);
+//		HAL_Delay(100);
 	}
 }
 

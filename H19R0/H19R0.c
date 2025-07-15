@@ -1,11 +1,10 @@
-/**
- * @file main.c
+/*
+ * BitzOS (BOS) V0.4.0 - Copyright (C) 2017-2025 Hexabitz
+ * All rights reserved
  * @brief General template for Hexabitz module H19R0, managing system initialization and motor control.
  * @details Initializes UART1-6, DMA channels, and timers for motor control. Provides CLI commands
  *          for motor control: stop_motor, set_position, set_speed, set_torque. Processes messages
  *          for motor position, speed, and torque control. Manages power modes and flash storage.
- * @author Hexabitz
- * @copyright (C) 2017-2025 Hexabitz
  */
 
 /* Includes ****************************************************************/
@@ -42,8 +41,8 @@ static portBASE_TYPE CLI_MotorSetTorqueCommand(int8_t *pcWriteBuffer, size_t xWr
 
 /* CLI command structure : MotorTurnOff */
 const CLI_Command_Definition_t CLI_MotorTurnOffCommandDefinition = {
-    (const int8_t *)"stop_motor",
-    (const int8_t *)"stop_motor:\r\nStops the motor.\n\r",
+    (const int8_t *)"stop",
+    (const int8_t *)"stop:\r\nStops the motor.\n\r",
     CLI_MotorTurnOffCommand, /* The function to run. */
     0 /* No parameters are expected. */
 };
@@ -51,8 +50,8 @@ const CLI_Command_Definition_t CLI_MotorTurnOffCommandDefinition = {
 /***************************************************************************/
 /* CLI command structure : MotorMoveToAngle */
 const CLI_Command_Definition_t CLI_MotorMoveToAngleCommandDefinition = {
-    (const int8_t *)"set_angle",
-    (const int8_t *)"set_angle:\r\nSets motor angle and duration.\r\nParameters:\r\n1) Angle: float\r\n2) Duration: float\n\r",
+    (const int8_t *)"angle",
+    (const int8_t *)"angle:\r\nSets motor angle and duration.\r\nParameters:\r\n1) Angle: float\r\n2) Duration: float\n\r",
     CLI_MotorMoveToAngleCommand, /* The function to run. */
     2 /* Two parameters are expected. */
 };
@@ -60,8 +59,8 @@ const CLI_Command_Definition_t CLI_MotorMoveToAngleCommandDefinition = {
 /***************************************************************************/
 /* CLI command structure : MotorSpeedControl */
 const CLI_Command_Definition_t CLI_MotorSpeedControlCommandDefinition = {
-    (const int8_t *)"set_speed",
-    (const int8_t *)"set_speed:\r\nSets motor speed and duration.\r\nParameters:\r\n1) Time: ms\r\n2) Speed: int\n\r",
+    (const int8_t *)"speed",
+    (const int8_t *)"speed:\r\nSets motor speed and duration.\r\nParameters:\r\n1) Time: ms\r\n2) Speed: int\n\r",
     CLI_MotorSpeedControlCommand, /* The function to run. */
     2 /* Two parameters are expected. */
 };
@@ -69,8 +68,8 @@ const CLI_Command_Definition_t CLI_MotorSpeedControlCommandDefinition = {
 /***************************************************************************/
 /* CLI command structure : MotorSetTorque */
 const CLI_Command_Definition_t CLI_MotorSetTorqueCommandDefinition = {
-    (const int8_t *)"set_torque",
-    (const int8_t *)"set_torque:\r\nSets motor torque and duration.\r\nParameters:\r\n1) Time: ms\r\n2) Torque: int\n\r",
+    (const int8_t *)"torque",
+    (const int8_t *)"torque:\r\nSets motor torque and duration.\r\nParameters:\r\n1) Time: ms\r\n2) Torque: int\n\r",
     CLI_MotorSetTorqueCommand, /* The function to run. */
     2 /* Two parameters are expected. */
 };
@@ -569,24 +568,25 @@ Module_Status MotorTurnOff(void) {
     Stop(); // Assuming Stop() is defined in a motor control library
     return H19R0_OK;
 }
+
 /***************************************************************************/
 /**
- * @brief Sets the motor position and duration.
- * @param Position Target position (float).
- * @param Duration Duration to reach the position (float).
- * @retval Module_Status Returns H19R0_OK on success.
+ * @brief Moves the motor to a target position over a specified duration.
+ * @param Position Target angle in degrees (float).
+ * @param Duration Time to reach the position in seconds (float).
+ * @retval Module_Status H19R0_OK on success.
  */
 Module_Status MotorMoveToAngle(float Position, float Duration) {
-    SetPosition(Position *2, Duration); // Assuming SetPosition() is defined in a motor control library
+    SetPosition(Position , Duration); // Assuming SetPosition() is defined in a motor control library
     return H19R0_OK;
 }
 
 /***************************************************************************/
 /**
- * @brief Sets the motor speed and duration.
- * @param Time Duration in milliseconds.
- * @param Speed Target speed (int16_t).
- * @retval Module_Status Returns H19R0_OK on success.
+ * @brief Sets the motor to a target speed for a specified duration.
+ * @param Time Duration in milliseconds (uint16_t).
+ * @param Speed Target speed in user-defined units (int16_t).
+ * @retval Module_Status H19R0_OK on success.
  */
 Module_Status MotorSpeedControl(uint16_t Time, int16_t Speed) {
     SetSpeed(Time, Speed); // Assuming SetSpeed() is defined in a motor control library
@@ -595,10 +595,10 @@ Module_Status MotorSpeedControl(uint16_t Time, int16_t Speed) {
 
 /***************************************************************************/
 /**
- * @brief Sets the motor torque and duration.
- * @param Time Duration in milliseconds.
- * @param Torque Target torque (int16_t).
- * @retval Module_Status Returns H19R0_OK on success.
+ * @brief Sets the motor to a target torque for a specified duration.
+ * @param Time Duration in milliseconds (uint16_t).
+ * @param Torque Target torque in user-defined units (int16_t).
+ * @retval Module_Status H19R0_OK on success.
  */
 Module_Status MotorSetTorque(uint16_t Time, int16_t Torque) {
     SetTorque(Time, Torque); // Assuming SetTorque() is defined in a motor control library
@@ -663,8 +663,8 @@ portBASE_TYPE CLI_MotorSpeedControlCommand(int8_t *pcWriteBuffer, size_t xWriteB
     (void)xWriteBufferLen;
     configASSERT(pcWriteBuffer);
     portBASE_TYPE len1, len2;
-    uint16_t time = (uint16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &len1));
-    int16_t speed = (int16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &len2));
+    uint16_t speed = (uint16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &len1));
+    int16_t time = (int16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &len2));
     Module_Status status = MotorSpeedControl(time, speed);
     sprintf((char *)pcWriteBuffer, (status == H19R0_OK) ? "Speed: %d Time: %dms\n\r" : "Error setting speed.\n\r", speed, time);
     return pdFALSE;
@@ -681,8 +681,8 @@ portBASE_TYPE CLI_MotorSetTorqueCommand(int8_t *pcWriteBuffer, size_t xWriteBuff
     (void)xWriteBufferLen;
     configASSERT(pcWriteBuffer);
     portBASE_TYPE len1, len2;
-    uint16_t time = (uint16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &len1));
-    int16_t torque = (int16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &len2));
+    uint16_t torque = (uint16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &len1));
+    int16_t time = (int16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &len2));
     Module_Status status = MotorSetTorque(time, torque);
     sprintf((char *)pcWriteBuffer, (status == H19R0_OK) ? "Torque: %d Time: %dms\n\r" : "Error setting torque.\n\r", torque, time);
     return pdFALSE;
