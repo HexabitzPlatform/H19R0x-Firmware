@@ -22,27 +22,54 @@ DMA_HandleTypeDef hdma_usart6_rx;
 /***************************************************************************/
 /* Configure UARTs *********************************************************/
 /***************************************************************************/
-/* USART1 init function */
-#ifdef _USART1
-
-void MX_USART1_UART_Init(void){
-	  huart1.Instance = USART1;
-	  huart1.Init.BaudRate = 19200;//DEF_ARRAY_BAUDRATE;
-	  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-	  huart1.Init.StopBits = UART_STOPBITS_1;
-	  huart1.Init.Parity = UART_PARITY_NONE;
-	  huart1.Init.Mode = UART_MODE_TX_RX;
-	  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-	  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-	  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-	  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-	  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-	  HAL_UART_Init(&huart1);
-	  HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8);
-	  HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8);
-	  HAL_UARTEx_DisableFifoMode(&huart1);
+/* STSPIN special UART */
+void UARTInitSTSPIN(void) {
+	huart1.Instance = USART1;
+	huart1.Init.BaudRate = 19200; //DEF_ARRAY_BAUDRATE;
+	huart1.Init.WordLength = UART_WORDLENGTH_8B;
+	huart1.Init.StopBits = UART_STOPBITS_1;
+	huart1.Init.Parity = UART_PARITY_NONE;
+	huart1.Init.Mode = UART_MODE_TX_RX;
+	huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+	huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+	huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+	huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+	HAL_UART_Init(&huart1);
+	HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8);
+	HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8);
+	HAL_UARTEx_DisableFifoMode(&huart1);
 }
 
+/***************************************************************************/
+/* USART1 init function */
+#ifdef _USART1
+void MX_USART1_UART_Init(void){
+	huart1.Instance = USART1;
+	huart1.Init.BaudRate = DEF_ARRAY_BAUDRATE;
+	huart1.Init.WordLength = UART_WORDLENGTH_8B;
+	huart1.Init.StopBits = UART_STOPBITS_1;
+	huart1.Init.Parity = UART_PARITY_NONE;
+	huart1.Init.Mode = UART_MODE_TX_RX;
+	huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+	huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+	huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+	huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+	HAL_UART_Init(&huart1);
+
+	HAL_UARTEx_SetTxFifoThreshold(&huart1,UART_TXFIFO_THRESHOLD_1_8);
+
+	HAL_UARTEx_SetRxFifoThreshold(&huart1,UART_RXFIFO_THRESHOLD_1_8);
+
+	HAL_UARTEx_DisableFifoMode(&huart1);
+
+#if _P4pol_reversed
+	huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_SWAP_INIT;
+	huart1.AdvancedInit.Swap = UART_ADVFEATURE_SWAP_ENABLE;
+	HAL_UART_Init(&huart1);
+	#endif
+}
 #endif
 /***************************************************************************/
 /* USART2 init function */

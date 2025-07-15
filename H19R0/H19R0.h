@@ -20,6 +20,7 @@
 #include "H19R0_dma.h"
 #include "H19R0_inputs.h"
 #include "H19R0_eeprom.h"
+
 #include "Commands_Driver_APIs.h"
 
 /* Exported Macros *********************************************************/
@@ -36,7 +37,7 @@
 #define _P4
 
 /* Define Available USARTs */
-#define _USART1
+//#define _USART1
 #define _USART2
 #define _USART3
 #define _USART5

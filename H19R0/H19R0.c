@@ -443,7 +443,7 @@ void SetupPortForRemoteBootloaderUpdate(uint8_t port) {
 /* H19R0 module initialization */
 void Module_Peripheral_Init(void) {
     /* Initialize UART ports */
-    MX_USART1_UART_Init();
+	UARTInitSTSPIN();
     MX_USART2_UART_Init();
     MX_USART3_UART_Init();
     MX_USART5_UART_Init();
