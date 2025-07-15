@@ -37,7 +37,7 @@
 #define _P4
 
 /* Define Available USARTs */
-//#define _USART1
+#define _USART1
 #define _USART2
 #define _USART3
 #define _USART5
