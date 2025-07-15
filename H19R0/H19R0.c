@@ -26,8 +26,6 @@ UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart5;
 UART_HandleTypeDef huart6;
 
-/* Private Variables *******************************************************/
-
 /* Module Parameters */
 ModuleParam_t ModuleParam[NUM_MODULE_PARAMS] = { 0 };
 
@@ -50,6 +48,7 @@ const CLI_Command_Definition_t CLI_MotorTurnOffCommandDefinition = {
     0 /* No parameters are expected. */
 };
 
+/***************************************************************************/
 /* CLI command structure : MotorMoveToAngle */
 const CLI_Command_Definition_t CLI_MotorMoveToAngleCommandDefinition = {
     (const int8_t *)"set_angle",
@@ -58,6 +57,7 @@ const CLI_Command_Definition_t CLI_MotorMoveToAngleCommandDefinition = {
     2 /* Two parameters are expected. */
 };
 
+/***************************************************************************/
 /* CLI command structure : MotorSpeedControl */
 const CLI_Command_Definition_t CLI_MotorSpeedControlCommandDefinition = {
     (const int8_t *)"set_speed",
@@ -66,6 +66,7 @@ const CLI_Command_Definition_t CLI_MotorSpeedControlCommandDefinition = {
     2 /* Two parameters are expected. */
 };
 
+/***************************************************************************/
 /* CLI command structure : MotorSetTorque */
 const CLI_Command_Definition_t CLI_MotorSetTorqueCommandDefinition = {
     (const int8_t *)"set_torque",
@@ -528,7 +529,7 @@ Module_Status Module_MessagingTask(uint16_t code, uint8_t port, uint8_t src, uin
             break;
 
         default:
-            result = H19R0_ERR_UnknownMessage;
+            result = H19R0_ERR_UNKNOWNMESSAGE;
             break;
     }
     return result;
@@ -556,12 +557,6 @@ void RegisterModuleCLICommands(void) {
 	FreeRTOS_CLIRegisterCommand(&CLI_MotorSpeedControlCommandDefinition);
 	FreeRTOS_CLIRegisterCommand(&CLI_MotorSetTorqueCommandDefinition);
 }
-
-/***************************************************************************/
-/****************************** Local Functions ****************************/
-/***************************************************************************/
-
-
 
 /***************************************************************************/
 /***************************** General Functions ***************************/

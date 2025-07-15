@@ -8,11 +8,11 @@
  Functions: Motor control interfaces and constants.
  */
 
-/* Define to prevent recursive inclusion -------------------------------------*/
+/* Define to prevent recursive inclusion ***********************************/
 #ifndef H19R0_H
 #define H19R0_H
 
-/* Includes ------------------------------------------------------------------*/
+/* Includes ****************************************************************/
 #include "BOS.h"
 #include "H19R0_MemoryMap.h"
 #include "H19R0_uart.h"
@@ -20,7 +20,7 @@
 #include "H19R0_dma.h"
 #include "H19R0_inputs.h"
 #include "H19R0_eeprom.h"
-#include"Commands_Driver_APIs.h"
+#include "Commands_Driver_APIs.h"
 
 /* Exported Macros *********************************************************/
 #define	MODULE_PN		_H19R0
@@ -89,8 +89,8 @@
 /* Module_Status Type Definition */
 typedef enum {
 	H19R0_OK = 0,
-	H19R0_ERR_UnknownMessage,
-	H19R0_ERR_WrongParams,
+	H19R0_ERR_UNKNOWNMESSAGE,
+	H19R0_ERR_WRONGPARAMS,
 	H19R0_ERR_TERMINATED,
 	H19R0_ERROR = 255
 } Module_Status;
@@ -114,7 +114,6 @@ extern void MX_USART6_UART_Init(void);
 /***************************************************************************/
 /***************************** General Functions ***************************/
 /***************************************************************************/
-
 uint8_t MotorTurnOff();
 uint8_t MotorMoveToAngle(float Position, float Duration);
 uint8_t MotorSpeedControl(uint16_t Time, int16_t Speed);
@@ -123,4 +122,4 @@ uint8_t MotorGetAngle(float *Position);
 
 #endif /* H19R0_H */
 
-/************************ (C) COPYRIGHT HEXABITZ *****END OF FILE****/
+/***************** (C) COPYRIGHT HEXABITZ ***** END OF FILE ****************/
