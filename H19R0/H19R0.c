@@ -1,32 +1,23 @@
-/*
- BitzOS (BOS) V0.3.6 - Copyright (C) 2017-2024 Hexabitz
- All rights reserved
-
- File Name     : H19R0.c
- Description   : Source code for module H19R0.
- IR Time-if-Flight (ToF) Sensor (ST VL53L1CX)
-
- Required MCU resources :
-
- >> USARTs 1,2,3,4,5,6 for module ports (H19R0).
- >> I2C2 for the ToF sensor.
- >> GPIOB 1 for ToF interrupt (INT).
- >> GPIOA 5 for ToF shutdown (XSHUT).
-
+/**
+ * @file main.c
+ * @brief General template for Hexabitz module H19R0, managing system initialization and motor control.
+ * @details Initializes UART1-6, DMA channels, and timers for motor control. Provides CLI commands
+ *          for motor control: stop_motor, set_position, set_speed, set_torque. Processes messages
+ *          for motor position, speed, and torque control. Manages power modes and flash storage.
+ * @author Hexabitz
+ * @copyright (C) 2017-2025 Hexabitz
  */
-#define CODE_H19R0_TURN_ON        0x01
-#define CODE_H19R0_TURN_OFF       0x02
-#define CODE_H19R0_TURN_PWM       0x03
-#define CODE_H19R0_STOP           0x04
-#define CODE_H19R0_SET_POSITION   0x05
-#define CODE_H19R0_SET_SPEED      0x06
-#define CODE_H19R0_SET_TORQUE     0x07
 
-/* Includes ------------------------------------------------------------------*/
+/* Includes ****************************************************************/
 #include "BOS.h"
-#include <stdlib.h>
+#include "FreeRTOS.h"
+#include "task.h"
+#include "timers.h"
+#include "string.h"
+#include "stdio.h"
+#include "stdlib.h"
 
-
+/* Exported Typedef ********************************************************/
 /* Define UART variables */
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
@@ -35,497 +26,515 @@ UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart5;
 UART_HandleTypeDef huart6;
 
-/* Exported variables */
-extern FLASH_ProcessTypeDef pFlash;
-extern uint8_t numOfRecordedSnippets;
-EventGroupHandle_t handleNewReadyData = NULL;
-/* variables for Streams ----------------------------------------------------*/
-uint32_t numofsamples[2], Timeout[2];
-uint8_t Port[2], Module[2], mode[2];
-uint8_t bldcMode;
-uint16_t Index =0;
+/* Private Variables *******************************************************/
 
-/* Module exported parameters ------------------------------------------------*/
-module_param_t modParam[NUM_MODULE_PARAMS];
+/* Module Parameters */
+ModuleParam_t ModuleParam[NUM_MODULE_PARAMS] = { 0 };
 
-/* Private variables ---------------------------------------------------------*/
-TaskHandle_t BLDC_TaskTaskHandle = NULL;
-static bool stopStream = false;
-uint8_t StopeCliStreamFlag;
-/* Exported Typedef ----------------------------------------------------------*/
-typedef void (*SampleMemsToBuffer)(float *buffer);
-typedef void (*SampleToString)(char*,size_t);
+/* Private Function Prototypes *********************************************/
+void Module_Peripheral_Init(void);
 
-/* Private function prototypes -----------------------------------------------*/
-void BLDCTask(void *argument);
-Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function);
-Module_Status Exportstreamtoport(uint8_t module,uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout);
-Module_Status Exportstreamtoterminal(uint8_t Port,All_Data function,uint32_t Numofsamples,uint32_t timeout);
-static Module_Status PollingSleepCLISafe(uint32_t period,long Numofsamples);
-static Module_Status StreamMemsToBuf(float *buffer,uint32_t Numofsamples,uint32_t timeout,SampleMemsToBuffer function);
-void SamplePosBuff(float *buffer);
-/* Create CLI commands --------------------------------------------------------*/
-/* CLI command functions ****************************************************/
-static portBASE_TYPE CLI_StopMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
-static portBASE_TYPE CLI_SetPositionMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
-static portBASE_TYPE CLI_SetSpeedMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
-static portBASE_TYPE CLI_SetTorqueMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
+/* Create CLI Commands *****************************************************/
+static portBASE_TYPE CLI_MotorTurnOffCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
+static portBASE_TYPE CLI_MotorMoveToAngleCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
+static portBASE_TYPE CLI_MotorSpeedControlCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
+static portBASE_TYPE CLI_MotorSetTorqueCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString);
 
-/***************************************************************************/
-/* Private CLI functions */
-static Module_Status StreamToCLI(uint32_t Numofsamples,uint32_t timeout,SampleToString function);
-void SamplePosToString(char *cstring,size_t maxLen);/* CLI command: stop_motor */
-const CLI_Command_Definition_t CLI_StopMotorCommandDefinition = {
+/* CLI Command Structure ***************************************************/
+
+/* CLI command structure : MotorTurnOff */
+const CLI_Command_Definition_t CLI_MotorTurnOffCommandDefinition = {
     (const int8_t *)"stop_motor",
-    (const int8_t *)"stop_motor : Stop the motor immediately\n\r\n",
-    CLI_StopMotorCommand,
-    0
+    (const int8_t *)"stop_motor:\r\nStops the motor.\n\r",
+    CLI_MotorTurnOffCommand, /* The function to run. */
+    0 /* No parameters are expected. */
 };
 
-/***************************************************************************/
-/* CLI command: set_position */
-const CLI_Command_Definition_t CLI_SetPositionMotorCommandDefinition = {
-    (const int8_t *)"set_position",
-    (const int8_t *)"set_position : Set motor target position\n\r"
-                    " 1) Position (float)\n\r"
-                    " 2) Duration (float)\n\r\n",
-    CLI_SetPositionMotorCommand,
-    2
+/* CLI command structure : MotorMoveToAngle */
+const CLI_Command_Definition_t CLI_MotorMoveToAngleCommandDefinition = {
+    (const int8_t *)"set_angle",
+    (const int8_t *)"set_angle:\r\nSets motor angle and duration.\r\nParameters:\r\n1) Angle: float\r\n2) Duration: float\n\r",
+    CLI_MotorMoveToAngleCommand, /* The function to run. */
+    2 /* Two parameters are expected. */
 };
 
-/***************************************************************************/
-/* CLI command: set_speed */
-const CLI_Command_Definition_t CLI_SetSpeedMotorCommandDefinition = {
+/* CLI command structure : MotorSpeedControl */
+const CLI_Command_Definition_t CLI_MotorSpeedControlCommandDefinition = {
     (const int8_t *)"set_speed",
-    (const int8_t *)"set_speed : Set motor speed for a specific duration\n\r"
-                    " 1) Time (ms)\n\r"
-                    " 2) Speed (int)\n\r\n",
-    CLI_SetSpeedMotorCommand,
-    2
+    (const int8_t *)"set_speed:\r\nSets motor speed and duration.\r\nParameters:\r\n1) Time: ms\r\n2) Speed: int\n\r",
+    CLI_MotorSpeedControlCommand, /* The function to run. */
+    2 /* Two parameters are expected. */
 };
 
-/***************************************************************************/
-/* CLI command: set_torque */
-const CLI_Command_Definition_t CLI_SetTorqueMotorCommandDefinition = {
+/* CLI command structure : MotorSetTorque */
+const CLI_Command_Definition_t CLI_MotorSetTorqueCommandDefinition = {
     (const int8_t *)"set_torque",
-    (const int8_t *)"set_torque : Set motor torque for a specific duration\n\r"
-                    " 1) Time (ms)\n\r"
-                    " 2) Torque (int)\n\r\n",
-    CLI_SetTorqueMotorCommand,
-    2
+    (const int8_t *)"set_torque:\r\nSets motor torque and duration.\r\nParameters:\r\n1) Time: ms\r\n2) Torque: int\n\r",
+    CLI_MotorSetTorqueCommand, /* The function to run. */
+    2 /* Two parameters are expected. */
 };
-
-/*-----------------------------------------------------------*/
-/* CLI command structure : streamtcli */
-/*-----------------------------------------------------------*/
-static Module_Status StreamToCLI(uint32_t Numofsamples,uint32_t timeout,SampleToString function){
-	Module_Status status =H19R0_OK;
-	int8_t *pcOutputString = NULL;
-	uint32_t period =timeout / Numofsamples;
-	if(period < MIN_MEMS_PERIOD_MS)
-		return H19R0_ERR_WrongParams;
-
-	// TODO: Check if CLI is enable or not
-	for(uint8_t chr =0; chr < MSG_RX_BUF_SIZE; chr++){
-		if(UARTRxBuf[PcPort - 1][chr] == '\r'){
-			UARTRxBuf[PcPort - 1][chr] =0;
-		}
-	}
-	if(1 == StopeCliStreamFlag){
-		StopeCliStreamFlag =0;
-		static char *pcOKMessage =(int8_t* )"Stop stream !\n\r";
-		writePxITMutex(PcPort,pcOKMessage,strlen(pcOKMessage),10);
-		return status;
-	}
-	if(period > timeout)
-		timeout =period;
-
-	long numTimes =timeout / period;
-	stopStream = false;
-
-	while((numTimes-- > 0) || (timeout >= MAX_MEMS_TIMEOUT_MS)){
-		pcOutputString =FreeRTOS_CLIGetOutputBuffer();
-		function((char* )pcOutputString,100);
-
-		writePxMutex(PcPort,(char* )pcOutputString,strlen((char* )pcOutputString),cmd500ms,HAL_MAX_DELAY);
-		if(PollingSleepCLISafe(period,Numofsamples) != H19R0_OK)
-			break;
-	}
-
-	memset((char* )pcOutputString,0,configCOMMAND_INT_MAX_OUTPUT_SIZE);
-	sprintf((char* )pcOutputString,"\r\n");
-	return status;
-}
-/*-----------------------------------------------------------*/
-void SamplePosToString(char *cstring,size_t maxLen){
-
-	float pose;
-
-	GetPositionMotor(&pose);
-
-	snprintf(cstring,maxLen,"Pos(rad) : %.2f \r\n",pose);
-
-}
-/*-----------------------------------------------------------*/
-/* CLI command structure : sampletoport */
-
-/* -----------------------------------------------------------------------
- |                        Private Functions                              |
- -----------------------------------------------------------------------
- */
-
-/**
- * @brief  System Clock Configuration
- *         The system Clock is configured as follow :
- *            System Clock source            = PLL (HSE)
- *            SYSCLK(Hz)                     = 48000000
- *            HCLK(Hz)                       = 48000000
- *            AHB Prescaler                  = 1
- *            APB1 Prescaler                 = 1
- *            HSE Frequency(Hz)              = 8000000
- *            PREDIV                         = 1
- *            PLLMUL                         = 6
- *            Flash Latency(WS)              = 1
- * @param  None
- * @retval None
+/***************************************************************************/
+/************************ Private function Definitions *********************/
+/***************************************************************************/
+/* @brief  System Clock Configuration
+ *         This function configures the system clock as follows:
+ *            - System Clock source            = PLL (HSE)
+ *            - SYSCLK(Hz)                     = 64000000
+ *            - HCLK(Hz)                       = 64000000
+ *            - AHB Prescaler                  = 1
+ *            - APB1 Prescaler                 = 1
+ *            - HSE Frequency(Hz)              = 8000000
+ *            - PLLM                           = 1
+ *            - PLLN                           = 16
+ *            - PLLP                           = 2
+ *            - Flash Latency(WS)              = 2
+ *            - Clock Source for UART1,UART2,UART3 = 16MHz (HSI)
  */
 void SystemClock_Config(void) {
-	RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
-	RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
-	RCC_PeriphCLKInitTypeDef PeriphClkInit = { 0 };
+    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-	/** Configure the main internal regulator output voltage
-	 */
-	HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
-	/** Initializes the RCC Oscillators according to the specified parameters
-	 * in the RCC_OscInitTypeDef structure.
-	 */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI
-			| RCC_OSCILLATORTYPE_HSE;
-	RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-	RCC_OscInitStruct.LSIState = RCC_LSI_ON;
-	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-	RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV1;
-	RCC_OscInitStruct.PLL.PLLN = 12;
-	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-	RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
-	RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
-	HAL_RCC_OscConfig(&RCC_OscInitStruct);
+    HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-	/** Initializes the CPU, AHB and APB buses clocks
-	 */
-	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
-			| RCC_CLOCKTYPE_PCLK1;
-	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI | RCC_OSCILLATORTYPE_HSE;
+    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+    RCC_OscInitStruct.HSIDiv = RCC_HSI_DIV1;
+    RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+    RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV1;
+    RCC_OscInitStruct.PLL.PLLN = 16;
+    RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+    RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
+    RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+    HAL_RCC_OscConfig(&RCC_OscInitStruct);
 
-	HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
+    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1;
+    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
 
-	/** Initializes the peripherals clocks
-	 */
-	PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC
-			| RCC_PERIPHCLK_USART2;
-	PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
-	PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
-	HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
-	PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_I2C2;
-	PeriphClkInit.I2c2ClockSelection = RCC_I2C2CLKSOURCE_PCLK1;
+    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
+}
+/***************************************************************************/
+/* Enable stop mode regarding only UART1, UART2, and UART3 */
+BOS_Status EnableStopModebyUARTx(uint8_t port) {
+    UART_WakeUpTypeDef WakeUpSelection;
+    UART_HandleTypeDef *huart = GetUart(port);
 
-	HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
-	HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+    if ((huart->Instance == USART1) || (huart->Instance == USART2) || (huart->Instance == USART3)) {
+        /* Make sure that no UART transfer is ongoing */
+        while (__HAL_UART_GET_FLAG(huart, USART_ISR_BUSY) == SET);
 
+        /* Make sure that UART is ready to receive */
+        while (__HAL_UART_GET_FLAG(huart, USART_ISR_REACK) == RESET);
+
+        /* Set the wake-up event: specify wake-up on start-bit detection */
+        WakeUpSelection.WakeUpEvent = UART_WAKEUP_ON_STARTBIT;
+        HAL_UARTEx_StopModeWakeUpSourceConfig(huart, WakeUpSelection);
+
+        /* Enable the UART Wake UP from stop mode Interrupt */
+        __HAL_UART_ENABLE_IT(huart, UART_IT_WUF);
+
+        /* Enable MCU wake-up by UART */
+        HAL_UARTEx_EnableStopMode(huart);
+
+        /* Enter STOP mode */
+        HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
+    } else {
+        return BOS_ERROR;
+    }
+    return BOS_OK;
 }
 
-/* --- Trigger ST factory bootloader update for a remote module.
+/***************************************************************************/
+/* Enable standby mode regarding wake-up pins:
+ * WKUP1: PA0 pin
+ * WKUP4: PA2 pin
+ * WKUP6: PB5 pin
+ * WKUP2: PC13 pin
+ * NRST pin
  */
-void remoteBootloaderUpdate(uint8_t src, uint8_t dst, uint8_t inport,
-		uint8_t outport) {
+BOS_Status EnableStandbyModebyWakeupPinx(WakeupPins_t wakeupPins) {
+    /* Clear the WUF flag */
+    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WUF);
 
-	uint8_t myOutport = 0, lastModule = 0;
-	int8_t *pcOutputString;
+    /* Enable the WAKEUP PIN */
+    switch (wakeupPins) {
+        case PA0_PIN:
+            HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1); /* PA0 */
+            break;
+        case PA2_PIN:
+            HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN4); /* PA2 */
+            break;
+        case PB5_PIN:
+            HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN6); /* PB5 */
+            break;
+        case PC13_PIN:
+            HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN2); /* PC13 */
+            break;
+        case NRST_PIN:
+            /* Do nothing */
+            break;
+    }
 
-	/* 1. Get route to destination module */
-	myOutport = FindRoute(myID, dst);
-	if (outport && dst == myID) { /* This is a 'via port' update and I'm the last module */
-		myOutport = outport;
-		lastModule = myID;
-	} else if (outport == 0) { /* This is a remote update */
-		if (NumberOfHops(dst)== 1)
-		lastModule = myID;
-		else
-		lastModule = route[NumberOfHops(dst)-1]; /* previous module = route[Number of hops - 1] */
-	}
+    /* Enable SRAM content retention in Standby mode */
+    HAL_PWREx_EnableSRAMRetention();
 
-	/* 2. If this is the source of the message, show status on the CLI */
-	if (src == myID) {
-		/* Obtain the address of the output buffer.  Note there is no mutual
-		 exclusion on this buffer as it is assumed only one command console
-		 interface will be used at any one time. */
-		pcOutputString = FreeRTOS_CLIGetOutputBuffer();
+    /* Enter the standby mode */
+    HAL_PWR_EnterSTANDBYMode();
 
-		if (outport == 0)		// This is a remote module update
-			sprintf((char*) pcOutputString, pcRemoteBootloaderUpdateMessage,
-					dst);
-		else
-			// This is a 'via port' remote update
-			sprintf((char*) pcOutputString,
-					pcRemoteBootloaderUpdateViaPortMessage, dst, outport);
-
-		strcat((char*) pcOutputString, pcRemoteBootloaderUpdateWarningMessage);
-		writePxITMutex(inport, (char*) pcOutputString,
-				strlen((char*) pcOutputString), cmd50ms);
-		Delay_ms(100);
-	}
-
-	/* 3. Setup my inport and outport for bootloader update */
-	SetupPortForRemoteBootloaderUpdate(inport);
-	SetupPortForRemoteBootloaderUpdate(myOutport);
-
-	/* 5. Build a DMA stream between my inport and outport */
-	StartScastDMAStream(inport, myID, myOutport, myID, BIDIRECTIONAL,
-			0xFFFFFFFF, 0xFFFFFFFF, false);
+    return BOS_OK;
 }
 
-/* --- Setup a port for remote ST factory bootloader update:
- - Set baudrate to 57600
- - Enable even parity
- - Set datasize to 9 bits
+/***************************************************************************/
+/* Disable standby mode regarding wake-up pins:
+ * WKUP1: PA0 pin
+ * WKUP4: PA2 pin
+ * WKUP6: PB5 pin
+ * WKUP2: PC13 pin
+ * NRST pin
+ */
+BOS_Status DisableStandbyModeWakeupPinx(WakeupPins_t wakeupPins) {
+    /* Check if the MCU is in standby mode */
+    if (__HAL_PWR_GET_FLAG(PWR_FLAG_SB) != RESET) {
+        /* Clear the standby flag */
+        __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);
+
+        /* Disable Wake-up Pin */
+        switch (wakeupPins) {
+            case PA0_PIN:
+                HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN1); /* PA0 */
+                break;
+            case PA2_PIN:
+                HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN4); /* PA2 */
+                break;
+            case PB5_PIN:
+                HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN6); /* PB5 */
+                break;
+            case PC13_PIN:
+                HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN2); /* PC13 */
+                break;
+            case NRST_PIN:
+                /* Do nothing */
+                break;
+        }
+
+        /* Blink indicator for 1000ms */
+        IND_blink(1000);
+    }
+
+    return BOS_OK;
+}
+
+/***************************************************************************/
+/* Save topology in Read-Only flash memory */
+uint8_t SaveTopologyToRO(void) {
+    HAL_StatusTypeDef flashStatus = HAL_OK;
+    uint16_t flashAdd = 8; /* Starting address offset for topology */
+    uint16_t temp = 0;
+
+    /* Unlock the FLASH control register access */
+    HAL_FLASH_Unlock();
+
+    /* Erase Topology page */
+    FLASH_PageErase(FLASH_BANK_2, TOPOLOGY_PAGE_NUM);
+
+    /* Wait for erase operation to complete */
+    flashStatus = FLASH_WaitForLastOperation((uint32_t)HAL_FLASH_TIMEOUT_VALUE);
+    if (flashStatus != HAL_OK) {
+        /* Return FLASH error code */
+        return pFlash.ErrorCode;
+    } else {
+        /* Operation is completed, disable the PER Bit */
+        CLEAR_BIT(FLASH->CR, FLASH_CR_PER);
+    }
+
+    /* Save module's ID and topology */
+    if (myID) {
+        /* Save module's ID */
+        temp = (uint16_t)(N << 8) + myID;
+        HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, TOPOLOGY_START_ADDRESS, temp);
+
+        /* Wait for write operation to complete */
+        flashStatus = FLASH_WaitForLastOperation((uint32_t)HAL_FLASH_TIMEOUT_VALUE);
+        if (flashStatus != HAL_OK) {
+            /* Return FLASH error code */
+            return pFlash.ErrorCode;
+        } else {
+            /* Operation is completed, disable the PG Bit */
+            CLEAR_BIT(FLASH->CR, FLASH_CR_PG);
+        }
+
+        /* Save topology array */
+        for (uint8_t row = 1; row <= N; row++) {
+            for (uint8_t column = 0; column <= MAX_NUM_OF_PORTS; column++) {
+                /* Check if module serial number exists */
+                if (Array[row - 1][0]) {
+                    /* Save topology element in flash */
+                    HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, TOPOLOGY_START_ADDRESS + flashAdd, Array[row - 1][column]);
+                    /* Wait for write operation to complete */
+                    flashStatus = FLASH_WaitForLastOperation((uint32_t)HAL_FLASH_TIMEOUT_VALUE);
+                    if (flashStatus != HAL_OK) {
+                        /* Return FLASH error code */
+                        return pFlash.ErrorCode;
+                    } else {
+                        /* Operation is completed, disable the PG Bit */
+                        CLEAR_BIT(FLASH->CR, FLASH_CR_PG);
+                        /* Update flash address */
+                        flashAdd += 8;
+                    }
+                }
+            }
+        }
+    }
+
+    /* Lock the FLASH control register access */
+    HAL_FLASH_Lock();
+    return 0;
+}
+
+/***************************************************************************/
+/* Save command snippets in Read-Only flash memory */
+uint8_t SaveSnippetsToRO(void) {
+    HAL_StatusTypeDef FlashStatus = HAL_OK;
+    uint8_t snipBuffer[sizeof(Snippet_t) + 1] = {0};
+
+    /* Unlock the FLASH control register access */
+    HAL_FLASH_Unlock();
+
+    /* Erase Snippets page */
+    FLASH_PageErase(FLASH_BANK_2, SNIPPETS_PAGE_NUM);
+
+    /* Wait for erase operation to complete */
+    FlashStatus = FLASH_WaitForLastOperation((uint32_t)HAL_FLASH_TIMEOUT_VALUE);
+    if (FlashStatus != HAL_OK) {
+        /* Return FLASH error code */
+        return pFlash.ErrorCode;
+    } else {
+        /* Operation is completed, disable the PER Bit */
+        CLEAR_BIT(FLASH->CR, FLASH_CR_PER);
+    }
+
+    /* Save command snippets */
+    int currentAdd = SNIPPETS_START_ADDRESS;
+    for (uint8_t index = 0; index < NumOfRecordedSnippets; index++) {
+        /* Check if snippet condition is valid */
+        if (Snippets[index].Condition.ConditionType) {
+            /* Set snippet marker */
+            snipBuffer[0] = 0xFE;
+            memcpy((uint32_t*)&snipBuffer[1], (uint8_t*)&Snippets[index], sizeof(Snippet_t));
+
+            /* Write snippet structure to flash */
+            for (uint8_t j = 0; j < (sizeof(Snippet_t) / 4); j++) {
+                HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, currentAdd, *(uint64_t*)&snipBuffer[j * 8]);
+                FlashStatus = FLASH_WaitForLastOperation((uint32_t)HAL_FLASH_TIMEOUT_VALUE);
+                if (FlashStatus != HAL_OK) {
+                    /* Return FLASH error code */
+                    return pFlash.ErrorCode;
+                } else {
+                    /* Operation is completed, disable the PG Bit */
+                    CLEAR_BIT(FLASH->CR, FLASH_CR_PG);
+                    currentAdd += 8;
+                }
+            }
+
+            /* Write snippet command string to flash */
+            for (uint8_t j = 0; j < ((strlen(Snippets[index].CMD) + 1) / 4); j++) {
+                HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, currentAdd, *(uint64_t*)(Snippets[index].CMD + j * 4));
+                FlashStatus = FLASH_WaitForLastOperation((uint32_t)HAL_FLASH_TIMEOUT_VALUE);
+                if (FlashStatus != HAL_OK) {
+                    /* Return FLASH error code */
+                    return pFlash.ErrorCode;
+                } else {
+                    /* Operation is completed, disable the PG Bit */
+                    CLEAR_BIT(FLASH->CR, FLASH_CR_PG);
+                    currentAdd += 8;
+                }
+            }
+        }
+    }
+
+    /* Lock the FLASH control register access */
+    HAL_FLASH_Lock();
+    return 0;
+}
+
+/***************************************************************************/
+/* Clear topology in SRAM and Flash RO */
+uint8_t ClearROtopology(void) {
+    /* Clear the topology array */
+    memset(Array, 0, sizeof(Array));
+    N = 1;
+    myID = 0;
+
+    /* Save cleared topology to flash */
+    return SaveTopologyToRO();
+}
+
+/***************************************************************************/
+/* Trigger ST factory bootloader update for a remote module */
+void RemoteBootloaderUpdate(uint8_t src, uint8_t dst, uint8_t inport, uint8_t outport) {
+    uint8_t myOutport = 0, lastModule = 0;
+    int8_t *pcOutputString;
+
+    /* Find route to destination module */
+    myOutport = FindRoute(myID, dst);
+    if (outport && dst == myID) {
+        /* This is a 'via port' update and I'm the last module */
+        myOutport = outport;
+        lastModule = myID;
+    } else if (outport == 0) {
+        /* This is a remote update */
+        if (NumberOfHops(dst) == 1)
+            lastModule = myID;
+        else
+            lastModule = Route[NumberOfHops(dst) - 1]; /* Previous module */
+    }
+
+    /* If this is the source of the message, show status on the CLI */
+    if (src == myID) {
+        /* Obtain the address of the output buffer */
+        pcOutputString = FreeRTOS_CLIGetOutputBuffer();
+        if (outport == 0) {
+            /* Remote module update */
+            sprintf((char*)pcOutputString, pcRemoteBootloaderUpdateMessage, dst);
+        } else {
+            /* 'Via port' remote update */
+            sprintf((char*)pcOutputString, pcRemoteBootloaderUpdateViaPortMessage, dst, outport);
+        }
+        strcat((char*)pcOutputString, pcRemoteBootloaderUpdateWarningMessage);
+        writePxITMutex(inport, (char*)pcOutputString, strlen((char*)pcOutputString), cmd50ms);
+        Delay_ms(100);
+    }
+
+    /* Setup inport and outport for bootloader update */
+    SetupPortForRemoteBootloaderUpdate(inport);
+    SetupPortForRemoteBootloaderUpdate(myOutport);
+
+    /* Build a DMA stream between inport and outport */
+    StartScastDMAStream(inport, myID, myOutport, myID, BIDIRECTIONAL, 0xFFFFFFFF, 0xFFFFFFFF, false);
+}
+
+/***************************************************************************/
+/* Setup a port for remote ST factory bootloader update:
+ * Set baudrate to 57600
+ * Enable even parity
+ * Set datasize to 9 bits
  */
 void SetupPortForRemoteBootloaderUpdate(uint8_t port) {
-	UART_HandleTypeDef *huart = GetUart(port);
+    UART_HandleTypeDef *huart = GetUart(port);
 
-	huart->Init.BaudRate = 57600;
-	huart->Init.Parity = UART_PARITY_EVEN;
-	huart->Init.WordLength = UART_WORDLENGTH_9B;
-	HAL_UART_Init(huart);
+    /* Deinitialize UART */
+    HAL_UART_DeInit(huart);
 
-	/* The CLI port RXNE interrupt might be disabled so enable here again to be sure */
-	__HAL_UART_ENABLE_IT(huart, UART_IT_RXNE);
+    /* Configure UART for bootloader */
+    huart->Init.Parity = UART_PARITY_EVEN;
+    huart->Init.WordLength = UART_WORDLENGTH_9B;
+    HAL_UART_Init(huart);
+
+    /* Ensure RXNE interrupt is enabled */
+    __HAL_UART_ENABLE_IT(huart, UART_IT_RXNE);
 }
 
-/* --- H19R0 module initialization.
- */
+/***************************************************************************/
+/* H19R0 module initialization */
 void Module_Peripheral_Init(void) {
+    /* Initialize UART ports */
+    MX_USART1_UART_Init();
+    MX_USART2_UART_Init();
+    MX_USART3_UART_Init();
+    MX_USART5_UART_Init();
+    MX_USART6_UART_Init();
 
-	/* Array ports */
-	MX_USART1_UART_Init();
-	MX_USART2_UART_Init();
-	MX_USART3_UART_Init();
-	MX_USART5_UART_Init();
-	MX_USART6_UART_Init();
-
-	//Circulating DMA Channels ON All Module
-	for (int i = 1; i <= NumOfPorts; i++) {
-		if (GetUart(i) == &huart1) {
-			index_dma[i - 1] = &(DMA1_Channel1->CNDTR);
-		} else if (GetUart(i) == &huart2) {
-			index_dma[i - 1] = &(DMA1_Channel2->CNDTR);
-		} else if (GetUart(i) == &huart3) {
-			index_dma[i - 1] = &(DMA1_Channel3->CNDTR);
-		} else if (GetUart(i) == &huart4) {
-			index_dma[i - 1] = &(DMA1_Channel4->CNDTR);
-		} else if (GetUart(i) == &huart5) {
-			index_dma[i - 1] = &(DMA1_Channel5->CNDTR);
-		} else if (GetUart(i) == &huart6) {
-			index_dma[i - 1] = &(DMA1_Channel6->CNDTR);
-		}
-	}
-
-	/* Create a BLDC task */
-	xTaskCreate(BLDCTask, (const char*) "BLDCTask",
-			(2 * configMINIMAL_STACK_SIZE), NULL,
-			osPriorityNormal - osPriorityIdle, &BLDC_TaskTaskHandle);
-
+    /* Configure DMA channels for UARTs */
+    for (int i = 1; i <= NUM_OF_PORTS; i++) {
+        if (GetUart(i) == &huart1) {
+            dmaIndex[i - 1] = &(DMA1_Channel1->CNDTR);
+        } else if (GetUart(i) == &huart2) {
+            dmaIndex[i - 1] = &(DMA1_Channel2->CNDTR);
+        } else if (GetUart(i) == &huart3) {
+            dmaIndex[i - 1] = &(DMA1_Channel3->CNDTR);
+        } else if (GetUart(i) == &huart4) {
+            dmaIndex[i - 1] = &(DMA1_Channel4->CNDTR);
+        } else if (GetUart(i) == &huart5) {
+            dmaIndex[i - 1] = &(DMA1_Channel5->CNDTR);
+        } else if (GetUart(i) == &huart6) {
+            dmaIndex[i - 1] = &(DMA1_Channel6->CNDTR);
+        }
+    }
 }
 
-/*-----------------------------------------------------------*/
+/***************************************************************************/
+/* Samples a module parameter value based on parameter index */
+Module_Status GetModuleParameter(uint8_t paramIndex, float *value) {
+    Module_Status status = BOS_OK;
 
-/* --- Save array topology and Command Snippets in Flash RO ---
- */
-uint8_t SaveToRO(void) {
-	BOS_Status result = BOS_OK;
-	HAL_StatusTypeDef FlashStatus = HAL_OK;
-	uint16_t add = 8;
-	uint16_t temp = 0;
-	uint8_t snipBuffer[sizeof(snippet_t) + 1] = { 0 };
+    /* Check parameter index */
+    switch (paramIndex) {
+        default:
+            /* Invalid parameter index */
+            status = BOS_ERR_WrongParam;
+            break;
+    }
 
-	HAL_FLASH_Unlock();
-	/* Erase RO area */
-	FLASH_PageErase(FLASH_BANK_1, RO_START_ADDRESS);
-	FlashStatus = FLASH_WaitForLastOperation(
-			(uint32_t) HAL_FLASH_TIMEOUT_VALUE);
-	FLASH_PageErase(FLASH_BANK_1, RO_MID_ADDRESS);
-	//TOBECHECKED
-	FlashStatus = FLASH_WaitForLastOperation(
-			(uint32_t) HAL_FLASH_TIMEOUT_VALUE);
-	if (FlashStatus != HAL_OK) {
-		return pFlash.ErrorCode;
-	} else {
-		/* Operation is completed, disable the PER Bit */
-		CLEAR_BIT(FLASH->CR, FLASH_CR_PER);
-	}
-
-	/* Save number of modules and myID */
-	if (myID) {
-		temp = (uint16_t) (N << 8) + myID;
-		//HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD,RO_START_ADDRESS,temp);
-		HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, RO_START_ADDRESS, temp);
-		//TOBECHECKED
-		FlashStatus = FLASH_WaitForLastOperation(
-				(uint32_t) HAL_FLASH_TIMEOUT_VALUE);
-		if (FlashStatus != HAL_OK) {
-			return pFlash.ErrorCode;
-		} else {
-			/* If the program operation is completed, disable the PG Bit */
-			CLEAR_BIT(FLASH->CR, FLASH_CR_PG);
-		}
-
-		/* Save topology */
-		for (uint8_t i = 1; i <= N; i++) {
-			for (uint8_t j = 0; j <= MaxNumOfPorts; j++) {
-				if (array[i - 1][0]) {
-
-					HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD,
-							RO_START_ADDRESS + add, array[i - 1][j]);
-					//HALFWORD 	//TOBECHECKED
-					FlashStatus = FLASH_WaitForLastOperation(
-							(uint32_t) HAL_FLASH_TIMEOUT_VALUE);
-					if (FlashStatus != HAL_OK) {
-						return pFlash.ErrorCode;
-					} else {
-						/* If the program operation is completed, disable the PG Bit */
-						CLEAR_BIT(FLASH->CR, FLASH_CR_PG);
-						add += 8;
-					}
-				}
-			}
-		}
-	}
-
-	// Save Command Snippets
-	int currentAdd = RO_MID_ADDRESS;
-	for (uint8_t s = 0; s < numOfRecordedSnippets; s++) {
-		if (snippets[s].cond.conditionType) {
-			snipBuffer[0] = 0xFE;		// A marker to separate Snippets
-			memcpy((uint32_t*) &snipBuffer[1], (uint8_t*) &snippets[s],
-					sizeof(snippet_t));
-			// Copy the snippet struct buffer (20 x numOfRecordedSnippets). Note this is assuming sizeof(snippet_t) is even.
-			for (uint8_t j = 0; j < (sizeof(snippet_t) / 4); j++) {
-				HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, currentAdd,
-						*(uint64_t*) &snipBuffer[j * 8]);
-				//HALFWORD
-				//TOBECHECKED
-				FlashStatus = FLASH_WaitForLastOperation(
-						(uint32_t) HAL_FLASH_TIMEOUT_VALUE);
-				if (FlashStatus != HAL_OK) {
-					return pFlash.ErrorCode;
-				} else {
-					/* If the program operation is completed, disable the PG Bit */
-					CLEAR_BIT(FLASH->CR, FLASH_CR_PG);
-					currentAdd += 8;
-				}
-			}
-			// Copy the snippet commands buffer. Always an even number. Note the string termination char might be skipped
-			for (uint8_t j = 0; j < ((strlen(snippets[s].cmd) + 1) / 4); j++) {
-				HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, currentAdd,
-						*(uint64_t*) (snippets[s].cmd + j * 4));
-				//HALFWORD
-				//TOBECHECKED
-				FlashStatus = FLASH_WaitForLastOperation(
-						(uint32_t) HAL_FLASH_TIMEOUT_VALUE);
-				if (FlashStatus != HAL_OK) {
-					return pFlash.ErrorCode;
-				} else {
-					/* If the program operation is completed, disable the PG Bit */
-					CLEAR_BIT(FLASH->CR, FLASH_CR_PG);
-					currentAdd += 8;
-				}
-			}
-		}
-	}
-
-	HAL_FLASH_Lock();
-
-	return result;
+    return status;
 }
 
-/* --- Clear array topology in SRAM and Flash RO --- 
+/***************************************************************************/
+/**
+ * @brief Handles module messaging tasks for motor control.
+ * @param code Message code (e.g., CODE_H19R0_STOP, CODE_H19R0_SET_POSITION).
+ * @param port Port number receiving the message.
+ * @param src Source module ID.
+ * @param dst Destination module ID.
+ * @param shift Shift offset for message data.
+ * @retval Module_Status Returns H19R0_OK on success, H19R0_ERR_UnknownMessage on unknown code.
  */
-uint8_t ClearROtopology(void) {
-	// Clear the array
-	memset(array, 0, sizeof(array));
-	N = 1;
-	myID = 0;
+Module_Status Module_MessagingTask(uint16_t code, uint8_t port, uint8_t src, uint8_t dst, uint8_t shift) {
+    Module_Status result = H19R0_OK;
+    float position = 0.0f, duration = 0.0f;
+    uint16_t time = 0;
+    int16_t value = 0;
+    uint32_t Number_int;
 
-	return SaveToRO();
+    switch (code) {
+        case CODE_H19R0_STOP:
+            result = MotorTurnOff();
+            break;
+
+        case CODE_H19R0_SET_POSITION:
+            /* Extract position */
+            Number_int = ((uint32_t)cMessage[port - 1][shift] +
+                          ((uint32_t)cMessage[port - 1][1 + shift] << 8) +
+                          ((uint32_t)cMessage[port - 1][2 + shift] << 16) +
+                          ((uint32_t)cMessage[port - 1][3 + shift] << 24));
+            position = *((float*)&Number_int);
+            /* Extract duration */
+            Number_int = ((uint32_t)cMessage[port - 1][4 + shift] +
+                          ((uint32_t)cMessage[port - 1][5 + shift] << 8) +
+                          ((uint32_t)cMessage[port - 1][6 + shift] << 16) +
+                          ((uint32_t)cMessage[port - 1][7 + shift] << 24));
+            duration = *((float*)&Number_int);
+            result = MotorMoveToAngle(position, duration);
+            break;
+
+        case CODE_H19R0_SET_SPEED:
+        case CODE_H19R0_SET_TORQUE:
+            time = ((int16_t)cMessage[port - 1][shift]) + ((int16_t)cMessage[port - 1][1 + shift] << 8);
+            value = ((int16_t)cMessage[port - 1][2 + shift]) + ((int16_t)cMessage[port - 1][3 + shift] << 8);
+            result = (code == CODE_H19R0_SET_SPEED) ? MotorSpeedControl(time, value) : MotorSetTorque(time, value);
+            break;
+
+        default:
+            result = H19R0_ERR_UnknownMessage;
+            break;
+    }
+    return result;
 }
-
-/* --- H19R0 message processing task.
- */
-Module_Status Module_MessagingTask(uint16_t code, uint8_t port, uint8_t src, uint8_t dst, uint8_t shift)
- {Module_Status result = H19R0_OK;
-
- uint8_t direction = 0;
- uint8_t motor = 0;
- uint8_t dutyCycle = 0;
- float position = 0.0f;
- float duration = 0.0f;
- uint16_t time = 0;
- int16_t value = 0;
-
- switch (code) {
-
- 	/* Stop motor */
- 	case CODE_H19R0_STOP:
- 		result = StopMotor();
- 		break;
-
- 	/* Set position */
- 	case CODE_H19R0_SET_POSITION:
- 		position = *(float *)&cMessage[port - 1][shift];
- 		duration = *(float *)&cMessage[port - 1][shift + 4];
- 		result = SetPositionMotor(position, duration);
- 		break;
-
- 	/* Set speed */
- 	case CODE_H19R0_SET_SPEED:
- 		time  = *(uint16_t *)&cMessage[port - 1][shift];
- 		value = *(int16_t *)&cMessage[port - 1][shift + 2];
- 		result = SetSpeedMotor(time, value);
- 		break;
-
- 	/* Set torque */
- 	case CODE_H19R0_SET_TORQUE:
- 		time  = *(uint16_t *)&cMessage[port - 1][shift];
- 		value = *(int16_t *)&cMessage[port - 1][shift + 2];
- 		result = SetTorqueMotor(time, value);
- 		break;
-
- 	default:
- 		result = H19R0_ERR_UnknownMessage;
- 		break;
- }
-
- return result;
-}
-
-/*-----------------------------------------------------------*/
-
-/* --- Register this module CLI Commands
- */
-void RegisterModuleCLICommands(void) {
-	FreeRTOS_CLIRegisterCommand(&CLI_StopMotorCommandDefinition);
-	FreeRTOS_CLIRegisterCommand(&CLI_SetPositionMotorCommandDefinition);
-	FreeRTOS_CLIRegisterCommand(&CLI_SetSpeedMotorCommandDefinition);
-	FreeRTOS_CLIRegisterCommand(&CLI_SetTorqueMotorCommandDefinition);
-}
-
-/*-----------------------------------------------------------*/
-
-/* --- Get the port for a given UART.
- */
+/***************************************************************************/
+/* Get the port for a given UART */
 uint8_t GetPort(UART_HandleTypeDef *huart) {
 	if (huart->Instance == USART6)
 		return P1;
@@ -539,574 +548,150 @@ uint8_t GetPort(UART_HandleTypeDef *huart) {
 	return 0;
 }
 
-/*-----------------------------------------------------------*/
+/***************************************************************************/
+/* Register module CLI commands */
+void RegisterModuleCLICommands(void) {
+	FreeRTOS_CLIRegisterCommand(&CLI_MotorTurnOffCommandDefinition);
+	FreeRTOS_CLIRegisterCommand(&CLI_MotorMoveToAngleCommandDefinition);
+	FreeRTOS_CLIRegisterCommand(&CLI_MotorSpeedControlCommandDefinition);
+	FreeRTOS_CLIRegisterCommand(&CLI_MotorSetTorqueCommandDefinition);
+}
 
-/* --- BLDC streaming task
+/***************************************************************************/
+/****************************** Local Functions ****************************/
+/***************************************************************************/
+
+
+
+/***************************************************************************/
+/***************************** General Functions ***************************/
+/***************************************************************************/
+/**
+ * @brief Stops the motor.
+ * @retval Module_Status Returns H19R0_OK on success.
  */
-
-void BLDCTask(void *argument) {
-
-	/* Infinite loop */
-	for (;;) {
-		switch (bldcMode) {
-		case STREAM_TO_PORT:
-			Exportstreamtoport(Module[0], Port[0], mode[0], numofsamples[0],
-					Timeout[0]);
-			break;
-		case STREAM_TO_Terminal:
-			Exportstreamtoterminal(Port[1], mode[1], numofsamples[1],
-					Timeout[1]);
-			break;
-		default:
-			osDelay(10);
-			break;
-		}
-
-		taskYIELD();
-	}
+Module_Status MotorTurnOff(void) {
+    Stop(); // Assuming Stop() is defined in a motor control library
+    return H19R0_OK;
 }
-
-/*-----------------------------------------------------------*/
-Module_Status Exporttoport(uint8_t module, uint8_t port, All_Data function) {
-
-	float position, movDuration;
-	uint8_t mode;
-	static uint8_t temp[4] = { 0 };
-	Module_Status status = H19R0_OK;
-
-	switch (function) {
-	case POS:
-
-		if ((status = GetPositionMotor(&position)) != H19R0_OK)
-			return status = H19R0_ERROR;
-
-		if (module == myID || module == 0) {
-			temp[0] =(uint8_t )((*(uint32_t* )&position) >> 0);
-			temp[1] =(uint8_t )((*(uint32_t* )&position) >> 8);
-			temp[2] =(uint8_t )((*(uint32_t* )&position) >> 16);
-			temp[3] =(uint8_t )((*(uint32_t* )&position) >> 24);
-
-			writePxITMutex(port, (char*) &temp[0], 4* sizeof(uint8_t), 10);
-		}
-		else {
-			/* LSB first */
-			if (H19R0_OK == status)
-				messageParams[1] = BOS_OK;
-			else
-				messageParams[1] = BOS_ERROR;
-
-			messageParams[0] = FMT_FLOAT;
-			messageParams[2] = 1;
-			messageParams[3] = (uint8_t) ((*(uint32_t*) &position) >> 0);
-			messageParams[4] = (uint8_t) ((*(uint32_t*) &position) >> 8);
-			messageParams[5] = (uint8_t) ((*(uint32_t*) &position) >> 16);
-			messageParams[6] = (uint8_t) ((*(uint32_t*) &position) >> 24);
-
-			SendMessageToModule(module, CODE_READ_RESPONSE,
-					(sizeof(float) * 1) + 3);
-		}
-		break;
-	case MOV_DURATION:
-
-		if ((status = GetMoveDurationMotor(&movDuration)) != H19R0_OK)
-			return status = H19R0_ERROR;
-
-		if (module == myID || module == 0) {
-			temp[0] =(uint8_t )((*(uint32_t* )&movDuration) >> 0);
-			temp[1] =(uint8_t )((*(uint32_t* )&movDuration) >> 8);
-			temp[2] =(uint8_t )((*(uint32_t* )&movDuration) >> 16);
-			temp[3] =(uint8_t )((*(uint32_t* )&movDuration) >> 24);
-
-			writePxITMutex(port, (char*) &temp[0], 4* sizeof(uint8_t), 10);
-		}
-		else {
-			/* LSB first */
-			if (H19R0_OK == status)
-				messageParams[1] = BOS_OK;
-			else
-				messageParams[1] = BOS_ERROR;
-
-			messageParams[0] = FMT_FLOAT;
-			messageParams[2] = 1;
-			messageParams[3] = (uint8_t) ((*(uint32_t*) &movDuration) >> 0);
-			messageParams[4] = (uint8_t) ((*(uint32_t*) &movDuration) >> 8);
-			messageParams[5] = (uint8_t) ((*(uint32_t*) &movDuration) >> 16);
-			messageParams[6] = (uint8_t) ((*(uint32_t*) &movDuration) >> 24);
-
-			SendMessageToModule(module, CODE_READ_RESPONSE,
-					(sizeof(float) * 1) + 3);
-		}
-		break;
-	case MOD:
-
-		if ((status = GetModeMotor(&mode)) != H19R0_OK)
-			return status = H19R0_ERROR;
-
-		if (module == myID || module == 0) {
-			writePxITMutex(port, (char*) &mode, sizeof(uint8_t), 10);
-		}
-		else {
-			/* LSB first */
-			if (H19R0_OK == status)
-				messageParams[1] = BOS_OK;
-			else
-				messageParams[1] = BOS_ERROR;
-
-			messageParams[0] = FMT_UINT8;
-			messageParams[2] = 1;
-			messageParams[3] = (uint8_t) mode;
-
-
-			SendMessageToModule(module, CODE_READ_RESPONSE,
-					(sizeof(uint8_t) * 1) + 3);
-		}
-		break;
-	default:
-		status = H19R0_ERR_WrongParams;
-		break;
-	}
-
-
-	return status;
-}
-
-/*-----------------------------------------------------------*/
-Module_Status Exportstreamtoport(uint8_t module,uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout){
-	Module_Status status =H19R0_OK;
-	uint32_t samples =0;
-	uint32_t period =0;
-	period =timeout / Numofsamples;
-
-	if(timeout < MIN_PERIOD_MS || period < MIN_PERIOD_MS)
-		return H19R0_ERR_WrongParams;
-
-	while(samples < Numofsamples){
-		status =Exporttoport(module,port,function);
-		vTaskDelay(pdMS_TO_TICKS(period));
-		samples++;
-	}
-	bldcMode = DEFAULT;
-
-	return status;
-}
-/*-----------------------------------------------------------*/
-Module_Status Exportstreamtoterminal(uint8_t Port,All_Data function,uint32_t Numofsamples,uint32_t timeout){
-	Module_Status status =H19R0_OK;
-	int8_t *pcOutputString = NULL;
-	uint32_t period =timeout / Numofsamples;
-	char cstring[100];
-	float position =0, moveDuration;
-	uint8_t mode = 0;
-
-	if(period < MIN_MEMS_PERIOD_MS)
-		return H19R0_ERR_WrongParams;
-
-	// TODO: Check if CLI is enable or not
-	switch(function){
-		case POS:
-
-			if(period > timeout)
-				timeout =period;
-
-			stopStream = false;
-
-			while((Numofsamples-- > 0) || (timeout >= MAX_MEMS_TIMEOUT_MS)){
-				pcOutputString =FreeRTOS_CLIGetOutputBuffer();
-				if((status =GetPositionMotor(&position)) != H19R0_OK)
-					return status;
-
-				snprintf(cstring,50,"\n Position(rad) : %.2f \r\n",position);
-
-				writePxMutex(Port,(char* )cstring,strlen((char* )cstring),
-				cmd500ms,HAL_MAX_DELAY);
-				if(PollingSleepCLISafe(period,Numofsamples) != H19R0_OK)
-					break;
-			}
-			break;
-		case MOV_DURATION:
-
-			if(period > timeout)
-				timeout =period;
-
-			stopStream = false;
-
-			while((Numofsamples-- > 0) || (timeout >= MAX_MEMS_TIMEOUT_MS)){
-				pcOutputString =FreeRTOS_CLIGetOutputBuffer();
-				if((status =GetMoveDurationMotor(&moveDuration)) != H19R0_OK)
-					return status;
-
-				snprintf(cstring,50,"\n Move duration(sec) : %.2f \r\n",moveDuration);
-
-				writePxMutex(Port,(char* )cstring,strlen((char* )cstring),
-				cmd500ms,HAL_MAX_DELAY);
-				if(PollingSleepCLISafe(period,Numofsamples) != H19R0_OK)
-					break;
-			}
-			break;
-		case MOD:
-
-			if(period > timeout)
-				timeout =period;
-
-			stopStream = false;
-
-			while((Numofsamples-- > 0) || (timeout >= MAX_MEMS_TIMEOUT_MS)){
-				pcOutputString =FreeRTOS_CLIGetOutputBuffer();
-				if((status =GetModeMotor(&mode)) != H19R0_OK)
-					return status;
-
-				snprintf(cstring,50,"\n Mode : %d \r\n",mode);
-
-				writePxMutex(Port,(char* )cstring,strlen((char* )cstring),
-				cmd500ms,HAL_MAX_DELAY);
-				if(PollingSleepCLISafe(period,Numofsamples) != H19R0_OK)
-					break;
-			}
-			break;
-		default:
-			status =H19R0_ERR_WrongParams;
-			break;
-	}
-
-	bldcMode = DEFAULT;
-	return status;
-}
-/*-----------------------------------------------------------*/
-static Module_Status PollingSleepCLISafe(uint32_t period,long Numofsamples){
-	const unsigned DELTA_SLEEP_MS =100; // milliseconds
-	long numDeltaDelay =period / DELTA_SLEEP_MS;
-	unsigned lastDelayMS =period % DELTA_SLEEP_MS;
-
-	while(numDeltaDelay-- > 0){
-		vTaskDelay(pdMS_TO_TICKS(DELTA_SLEEP_MS));
-
-		// Look for ENTER key to stop the stream
-		for(uint8_t chr =1; chr < MSG_RX_BUF_SIZE; chr++){
-			if(UARTRxBuf[PcPort - 1][chr] == '\r'){
-				UARTRxBuf[PcPort - 1][chr] =0;
-				StopeCliStreamFlag =1;
-				return H19R0_ERR_TERMINATED;
-			}
-		}
-
-		if(stopStream)
-			return H19R0_ERR_TERMINATED;
-	}
-
-	vTaskDelay(pdMS_TO_TICKS(lastDelayMS));
-	return H19R0_OK;
-}
-
-/*-----------------------------------------------------------*/
-static Module_Status StreamMemsToBuf(float *buffer,uint32_t Numofsamples,uint32_t timeout,SampleMemsToBuffer function){
-	Module_Status status =H19R0_OK;
-	uint32_t period =timeout / Numofsamples;
-	if(period < MIN_MEMS_PERIOD_MS)
-		return H19R0_ERR_WrongParams;
-
-	// TODO: Check if CLI is enable or not
-
-	if(period > timeout)
-		timeout =period;
-
-	long numTimes =timeout / period;
-	stopStream = false;
-
-	while((numTimes-- > 0) || (timeout >= MAX_MEMS_TIMEOUT_MS)){
-		if(function == SamplePosBuff){
-			float sample;
-			function(&sample);
-			buffer[Index] =sample;
-			Index++;
-
-		}
-
-		vTaskDelay(pdMS_TO_TICKS(period));
-		if(stopStream){
-			status =H19R0_ERR_TERMINATED;
-			break;
-		}
-	}
-	return status;
-}
-
-/*-----------------------------------------------------------*/
-void SamplePosBuff(float *buffer){
-	float Pos;
-	GetPositionMotor(&Pos);
-	*buffer =Pos;
-}
-
-/*-----------------------------------------------------------*/
-void SampleMovDurationBuff(float *buffer){
-	float MovDuration;
-	GetMoveDurationMotor(&MovDuration);
-	*buffer =MovDuration;
-}
-
-/* -----------------------------------------------------------------------
- |                               APIs                                    |
- -----------------------------------------------------------------------
-
-/* Stop the motor */
-Module_Status StopMotor(void) {
-    Stop();
+/***************************************************************************/
+/**
+ * @brief Sets the motor position and duration.
+ * @param Position Target position (float).
+ * @param Duration Duration to reach the position (float).
+ * @retval Module_Status Returns H19R0_OK on success.
+ */
+Module_Status MotorMoveToAngle(float Position, float Duration) {
+    SetPosition(Position *2, Duration); // Assuming SetPosition() is defined in a motor control library
     return H19R0_OK;
 }
 
-
-/******************************************************************************/
-/* Set motor target position with movement duration
- * Position: target position in user-defined units
- * Duration: movement time
+/***************************************************************************/
+/**
+ * @brief Sets the motor speed and duration.
+ * @param Time Duration in milliseconds.
+ * @param Speed Target speed (int16_t).
+ * @retval Module_Status Returns H19R0_OK on success.
  */
-Module_Status SetPositionMotor(float Position, float Duration) {
-    SetPosition(Position, Duration);
+Module_Status MotorSpeedControl(uint16_t Time, int16_t Speed) {
+    SetSpeed(Time, Speed); // Assuming SetSpeed() is defined in a motor control library
     return H19R0_OK;
 }
 
-
-/******************************************************************************/
-/* Get the current position of the motor
- * Position: pointer to store the current position
+/***************************************************************************/
+/**
+ * @brief Sets the motor torque and duration.
+ * @param Time Duration in milliseconds.
+ * @param Torque Target torque (int16_t).
+ * @retval Module_Status Returns H19R0_OK on success.
  */
-Module_Status GetPositionMotor(float *Position) {
-    GetPosition(Position);
+Module_Status MotorSetTorque(uint16_t Time, int16_t Torque) {
+    SetTorque(Time, Torque); // Assuming SetTorque() is defined in a motor control library
     return H19R0_OK;
 }
 
-
-/******************************************************************************/
-/* Get the remaining move duration
- * MoveDuration: pointer to store the remaining duration
+/***************************************************************************/
+/**
+ * @brief Gets the current motor position.
+ * @param Position Pointer to store the current position.
+ * @retval Module_Status Returns H19R0_OK on success.
  */
-Module_Status GetMoveDurationMotor(float *MoveDuration) {
-    GetMoveDuration(MoveDuration);
+Module_Status MotorGetAngle(float *Position) {
+    GetPosition(Position); // Assuming GetPosition() is defined in a motor control library
     return H19R0_OK;
 }
 
-
-/******************************************************************************/
-/* Set motor speed for a given duration
- * Time: time in ms or user-defined units
- * Speed: target speed value
+/***************************************************************************/
+/********************************* Commands ********************************/
+/***************************************************************************/
+/**
+ * @brief CLI command to stop the motor.
+ * @param pcWriteBuffer Buffer to store the command output.
+ * @param xWriteBufferLen Length of the write buffer.
+ * @param pcCommandString Command string.
+ * @retval portBASE_TYPE Returns pdFALSE to indicate command completion.
  */
-Module_Status SetSpeedMotor(uint16_t Time, int16_t Speed) {
-    SetSpeed(Time, Speed);
-    return H19R0_OK;
-}
-
-
-/******************************************************************************/
-/* Set motor torque for a given duration
- * Time: time in ms or user-defined units
- * Torque: target torque value
- */
-Module_Status SetTorqueMotor(uint16_t Time, int16_t Torque) {
-    SetTorque(Time, Torque);
-    return H19R0_OK;
-}
-
-
-/******************************************************************************/
-/* Get current control mode of the motor
- * Mode: pointer to store current control mode
- */
-Module_Status GetModeMotor(uint8_t* Mode) {
-    GetControlMode(Mode);
-    return H19R0_OK;
-}
-
-
-/******************************************************************************/
-/* Stop current torque/speed ramp command */
-Module_Status StopRampCommandMotor(void) {
-    StopRampCommand();
-    return H19R0_OK;
-}
-
-
-
-/*-----------------------------------------------------------*/
-Module_Status SampletoPort(uint8_t module,uint8_t port,All_Data function){
-	Module_Status status =H19R0_OK;
-
-	if(port == 0 && module == myID)
-		return status =H19R0_ERR_WrongParams;
-
-	Exporttoport(module,port,function);
-
-	return status;
-
-}
-/*-----------------------------------------------------------*/
-Module_Status StreamtoPort(uint8_t module,uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout){
-	Module_Status status =H19R0_OK;
-
-	if(port == 0 && module == myID)
-		return status =H19R0_ERR_WrongParams;
-
-	bldcMode =STREAM_TO_PORT;
-	Port[0] =port;
-	Module[0] =module;
-	numofsamples[0] =Numofsamples;
-	Timeout[0] =timeout;
-	mode[0] =function;
-	return status;
-}
-
-/*-----------------------------------------------------------*/
-
-Module_Status StreamToTerminal(uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout){
-	Module_Status status =H19R0_OK;
-
-	if(0 == port)
-		return status =H19R0_ERR_WrongParams;
-
-	bldcMode =STREAM_TO_Terminal;
-	Port[1] =port;
-	numofsamples[1] =Numofsamples;
-	Timeout[1] =timeout;
-	mode[1] =function;
-	return status;
-}
-
-/*-----------------------------------------------------------*/
-
-Module_Status StreamToBuffer(float *buffer,All_Data function,uint32_t Numofsamples,uint32_t timeout){
-
-	switch(function){
-		case POS:
-			return StreamMemsToBuf(buffer,Numofsamples,timeout,SamplePosBuff);
-			break;
-		case MOV_DURATION:
-			return StreamMemsToBuf(buffer,Numofsamples,timeout,SampleMovDurationBuff);
-			break;
-		default:
-			break;
-	}
-}
-
-
-/* -----------------------------------------------------------------------
- |                             Commands                                  |
- -----------------------------------------------------------------------
- */
-portBASE_TYPE CLI_StopMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString) {
-
-	    Module_Status status = H19R0_OK;
-
-	    static const int8_t *pcOKMessage = (int8_t *)"Motor stopped successfully.\n\r";
-
-	    (void)xWriteBufferLen;
-	    configASSERT(pcWriteBuffer);
-
-	    status = StopMotor();
-
-	    if (status == H19R0_OK)
-	        strcpy((char *)pcWriteBuffer, (char *)pcOKMessage);
-	    else
-	        strcpy((char *)pcWriteBuffer, (char *)"Failed to stop motor.\n\r");
-
-	    return pdFALSE;
-	}
-
-
-/*-----------------------------------------------------------*/
-portBASE_TYPE CLI_SetPositionMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString) {
-    Module_Status status = H19R0_OK;
-
-    portBASE_TYPE xParamLen1 = 0, xParamLen2 = 0;
-    static int8_t *param1, *param2;
-    float position = 0.0f, duration = 0.0f;
-
-    static const int8_t *pcOKMessage = (int8_t *)"Position set to %.2f over %.2f seconds.\n\r";
-    static const int8_t *pcErrorMessage = (int8_t *)"Invalid parameters for position.\n\r";
-
+portBASE_TYPE CLI_MotorTurnOffCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString) {
     (void)xWriteBufferLen;
     configASSERT(pcWriteBuffer);
-
-    param1 = (int8_t *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen1);
-    param2 = (int8_t *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen2);
-
-    position = strtof((char *)param1, NULL);
-    duration = strtof((char *)param2, NULL);
-
-    status = SetPositionMotor(position, duration);
-
-    if (status == H19R0_OK)
-        sprintf((char *)pcWriteBuffer, (char *)pcOKMessage, position, duration);
-    else
-        strcpy((char *)pcWriteBuffer, (char *)pcErrorMessage);
-
+    Module_Status status = MotorTurnOff();
+    strcpy((char *)pcWriteBuffer, (status == H19R0_OK) ? "Motor stopped.\n\r" : "Failed to stop motor.\n\r");
+    return pdFALSE;
+}
+/***************************************************************************/
+/**
+ * @brief CLI command to set the motor position and duration.
+ * @param pcWriteBuffer Buffer to store the command output.
+ * @param xWriteBufferLen Length of the write buffer.
+ * @param pcCommandString Command string with position and duration parameters.
+ * @retval portBASE_TYPE Returns pdFALSE to indicate command completion.
+ */
+portBASE_TYPE CLI_MotorMoveToAngleCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString) {
+    (void)xWriteBufferLen;
+    configASSERT(pcWriteBuffer);
+    portBASE_TYPE len1, len2;
+    float position = strtof((char *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &len1), NULL);
+    float duration = strtof((char *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &len2), NULL);
+    Module_Status status = MotorMoveToAngle(position, duration);
+    sprintf((char *)pcWriteBuffer, (status == H19R0_OK) ? "Position: %.2f Duration: %.2f\n\r" : "Error setting position.\n\r", position, duration);
+    return pdFALSE;
+}
+/***************************************************************************/
+/**
+ * @brief CLI command to set the motor speed and duration.
+ * @param pcWriteBuffer Buffer to store the command output.
+ * @param xWriteBufferLen Length of the write buffer.
+ * @param pcCommandString Command string with time and speed parameters.
+ * @retval portBASE_TYPE Returns pdFALSE to indicate command completion.
+ */
+portBASE_TYPE CLI_MotorSpeedControlCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString) {
+    (void)xWriteBufferLen;
+    configASSERT(pcWriteBuffer);
+    portBASE_TYPE len1, len2;
+    uint16_t time = (uint16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &len1));
+    int16_t speed = (int16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &len2));
+    Module_Status status = MotorSpeedControl(time, speed);
+    sprintf((char *)pcWriteBuffer, (status == H19R0_OK) ? "Speed: %d Time: %dms\n\r" : "Error setting speed.\n\r", speed, time);
+    return pdFALSE;
+}
+/***************************************************************************/
+/**
+ * @brief CLI command to set the motor torque and duration.
+ * @param pcWriteBuffer Buffer to store the command output.
+ * @param xWriteBufferLen Length of the write buffer.
+ * @param pcCommandString Command string with time and torque parameters.
+ * @retval portBASE_TYPE Returns pdFALSE to indicate command completion.
+ */
+portBASE_TYPE CLI_MotorSetTorqueCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString) {
+    (void)xWriteBufferLen;
+    configASSERT(pcWriteBuffer);
+    portBASE_TYPE len1, len2;
+    uint16_t time = (uint16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &len1));
+    int16_t torque = (int16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &len2));
+    Module_Status status = MotorSetTorque(time, torque);
+    sprintf((char *)pcWriteBuffer, (status == H19R0_OK) ? "Torque: %d Time: %dms\n\r" : "Error setting torque.\n\r", torque, time);
     return pdFALSE;
 }
 
-
-/*-----------------------------------------------------------*/
-portBASE_TYPE CLI_SetSpeedMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString) {
-    Module_Status status = H19R0_OK;
-
-    portBASE_TYPE xParamLen1 = 0, xParamLen2 = 0;
-    static int8_t *param1, *param2;
-    uint16_t time = 0;
-    int16_t speed = 0;
-
-    static const int8_t *pcOKMessage = (int8_t *)"Speed set to %d for %d ms.\n\r";
-    static const int8_t *pcErrorMessage = (int8_t *)"Invalid parameters for speed.\n\r";
-
-    (void)xWriteBufferLen;
-    configASSERT(pcWriteBuffer);
-
-    param1 = (int8_t *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen1);
-    param2 = (int8_t *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen2);
-
-    time = (uint16_t)atoi((char *)param1);
-    speed = (int16_t)atoi((char *)param2);
-
-    status = SetSpeedMotor(time, speed);
-
-    if (status == H19R0_OK)
-        sprintf((char *)pcWriteBuffer, (char *)pcOKMessage, speed, time);
-    else
-        strcpy((char *)pcWriteBuffer, (char *)pcErrorMessage);
-
-    return pdFALSE;
-}
-
-/*-----------------------------------------------------------*/
-portBASE_TYPE CLI_SetTorqueMotorCommand(int8_t *pcWriteBuffer, size_t xWriteBufferLen, const int8_t *pcCommandString) {
-    Module_Status status = H19R0_OK;
-
-    portBASE_TYPE xParamLen1 = 0, xParamLen2 = 0;
-    static int8_t *param1, *param2;
-    uint16_t time = 0;
-    int16_t torque = 0;
-
-    static const int8_t *pcOKMessage = (int8_t *)"Torque set to %d for %d ms.\n\r";
-    static const int8_t *pcErrorMessage = (int8_t *)"Invalid parameters for torque.\n\r";
-
-    (void)xWriteBufferLen;
-    configASSERT(pcWriteBuffer);
-
-    param1 = (int8_t *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen1);
-    param2 = (int8_t *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen2);
-
-    time = (uint16_t)atoi((char *)param1);
-    torque = (int16_t)atoi((char *)param2);
-
-    status = SetTorqueMotor(time, torque);
-
-    if (status == H19R0_OK)
-        sprintf((char *)pcWriteBuffer, (char *)pcOKMessage, torque, time);
-    else
-        strcpy((char *)pcWriteBuffer, (char *)pcErrorMessage);
-
-    return pdFALSE;
-}
-
-
-
-/*-----------------------------------------------------------*/
-
-/************************ (C) COPYRIGHT HEXABITZ *****END OF FILE****/
+/***************************************************************************/
+/***************** (C) COPYRIGHT HEXABITZ ***** END OF FILE ****************/

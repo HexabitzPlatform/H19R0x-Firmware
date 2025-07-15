@@ -24,31 +24,25 @@ int main(void) {
 
 	}
 }
+volatile uint8_t motorTestSelector = 20;
 
 /*-----------------------------------------------------------*/
 float pose[10];
+uint8_t h[6] = {1,2,3,4,5,6};
+float position =0.0f;  // ≈ 90 degrees in radians
+float duration = 0.0f;   // move duration in seconds
+    uint8_t result = 0;
 /* User Task */
 void UserTask(void *argument) {
 
 	// put your code here, to run repeatedly.
 
-	// SetPosition(3.26, 1020);
-	GetPositionMotor(&Position);
-
-//	SetPositionMotor(3.26, 1020);
-	// SetSpeed(1000,500);
-
-	//Test_Function();
-
-
-	StreamToBuffer(pose, POS, 10, 10000);
 	while (1) {
-		HAL_GPIO_TogglePin(_IND_LED_PORT, _IND_LED_PIN);
-		// SampletoPort(0, 2, POS);
-
-		HAL_Delay(1000);
-
+//		SetPositionMotor(1.56, 1);
+////		SetSpeedMotor(50, 750);
+//		HAL_Delay(1000);
 	}
-}
+	}
+
 
 /*-----------------------------------------------------------*/

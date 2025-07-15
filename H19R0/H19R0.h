@@ -4,7 +4,8 @@
 
  File Name     : H19R0.h
  Description   : Header file for module H19R0.
- IR Time-if-Flight (ToF) Sensor (ST VL53L1CX)
+ Components: UART ports.
+ Functions: Motor control interfaces and constants.
  */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
@@ -21,32 +22,31 @@
 #include "H19R0_eeprom.h"
 #include"Commands_Driver_APIs.h"
 
-/* Exported definitions -------------------------------------------------------*/
-#define modulePN    _H19R0
+/* Exported Macros *********************************************************/
+#define	MODULE_PN		_H19R0
 
-/* Types of commands ----------------------------------------------------------*/
+/* Port-related Definitions */
+#define	NUM_OF_PORTS	4
+#define P_PROG 			P2		/* ST factory bootloader UART */
 
-/* Port-related definitions */
-#define NumOfPorts    4
-#define P_PROG        P2            /* ST factory bootloader UART */
 /* Define available ports */
 #define _P1
 #define _P2
 #define _P3
 #define _P4
 
-/* Define available USARTs */
-#define _Usart1 1
-#define _Usart2 1
-#define _Usart3 1
-#define _Usart5 1
-#define _Usart6 1
+/* Define Available USARTs */
+#define _USART1
+#define _USART2
+#define _USART3
+#define _USART5
+#define _USART6
 
 /* Port-UART mapping */
-#define P1uart &huart6
-#define P2uart &huart2
-#define P3uart &huart3
-#define P4uart &huart5
+#define UART_P1 &huart6
+#define UART_P2 &huart2
+#define UART_P3 &huart3
+#define UART_P4 &huart5
 
 /* Port Definitions */
 #define USART1_TX_PIN   GPIO_PIN_9
@@ -79,26 +79,12 @@
 #define USART6_RX_PORT  GPIOB
 #define USART6_AF       GPIO_AF8_USART6
 
-/* Module-specific Definitions */
-#define MIN_MEMS_PERIOD_MS		100
-#define MAX_MEMS_TIMEOUT_MS		0xFFFFFFFF
-#define NUM_MODULE_PARAMS						1
+/* Indicator LED */
+#define _IND_LED_PORT   GPIOA
+#define _IND_LED_PIN    GPIO_PIN_12
 
-#define MIN_PERIOD_MS			100
-/* Macros For BLDC special Task */
-#define SAMPLE_TO_PORT          1
-#define STREAM_TO_PORT          2
-#define STREAM_TO_Terminal      3
-#define DEFAULT                 4
-/* Module EEPROM Variables */
-
-// Module Addressing Space 500 - 599
-#define _EE_MODULE							500
-
-/* Choose the functionality of stream and sample APIs */
-typedef enum {
-	POS =0, MOD, MOV_DURATION,
-} All_Data;
+/* Module-specific Macro Definitions ***************************************/
+#define NUM_MODULE_PARAMS	   1
 
 /* Module_Status Type Definition */
 typedef enum {
@@ -108,10 +94,6 @@ typedef enum {
 	H19R0_ERR_TERMINATED,
 	H19R0_ERROR = 255
 } Module_Status;
-
-/* Indicator LED */
-#define _IND_LED_PORT   GPIOA
-#define _IND_LED_PIN    GPIO_PIN_12
 
 /* Export UART variables */
 extern UART_HandleTypeDef huart1;
@@ -129,73 +111,15 @@ extern void MX_USART4_UART_Init(void);
 extern void MX_USART5_UART_Init(void);
 extern void MX_USART6_UART_Init(void);
 
-/* -----------------------------------------------------------------------
- |                               APIs                                    |
- -----------------------------------------------------------------------
- */
+/***************************************************************************/
+/***************************** General Functions ***************************/
+/***************************************************************************/
 
-/**
- * @brief Programs stop rotation of Motor.
- *
- */
-uint8_t StopMotor();
-/**
- * @brief Programs a position command for Motor in the given @p Duration time.
- *
- * @param  Position Target mechanical angle reference at the end of the movement.
- *         This value represents the final position expressed in radian.
- * @param  Duration of the movement expressed in seconds.
- */
-uint8_t SetPositionMotor(float Position, float Duration);
-
-
-/**********************************************************************/
-
-/**
- * @brief returns the current position of Motor 1.
- *  	get position from initial position in radian
- *   */
-uint8_t GetPositionMotor(float *Position);
-
-/**********************************************************************/
-
-/**
- * @brief returns the last move duration of Motor 1 in seconds.
- *   */
-uint8_t GetMoveDurationMotor(float *MoveDuration);
-
-/**********************************************************************/
-/**
- * @brief Programs a speed command for Motor in the given @p Duration Time.
- *
- * @param  Speed Target mechanical angle reference at the end of the movement.
- *         This value represents the final position expressed in rpm.
- * @param  Duration of the movement expressed in ms.
- */
-uint8_t SetSpeedMotor(uint16_t Time, int16_t Speed);
-
-/**********************************************************************/
-/**
- * @brief Programs a torque command for Motor in the given @p Duration Time.
- *
- * @param  Mechanical motor torque reference at the end of the ramp.
-  *         This value represents actually the Iq current expressed in digit.
- * @param  Duration of the movement expressed in ms.
- */
-uint8_t SetTorqueMotor(uint16_t Time, int16_t Torque);
-
-uint8_t StopRampCommandMotor();
-
-uint8_t GetModeMotor(uint8_t* Mode);
-Module_Status SampletoPort(uint8_t module,uint8_t port,All_Data function);
-Module_Status StreamtoPort(uint8_t module,uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout);
-Module_Status StreamToTerminal(uint8_t port,All_Data function,uint32_t Numofsamples,uint32_t timeout);
-Module_Status StreamToBuffer(float *buffer,All_Data function, uint32_t Numofsamples, uint32_t timeout);
-
-/* -----------------------------------------------------------------------
- |                             Commands                                  |
- -----------------------------------------------------------------------
- */
+uint8_t MotorTurnOff();
+uint8_t MotorMoveToAngle(float Position, float Duration);
+uint8_t MotorSpeedControl(uint16_t Time, int16_t Speed);
+uint8_t MotorSetTorque(uint16_t Time, int16_t Torque);
+uint8_t MotorGetAngle(float *Position);
 
 #endif /* H19R0_H */
 
