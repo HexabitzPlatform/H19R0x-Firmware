@@ -3,7 +3,7 @@
  All rights reserved
 
  File Name  : H19R0_dma.c
- Description: Initialize and manage DMA for UART (P1-P6).
+ Description: Initialize and manage DMA for UART (P1-P4).
  DMA: Setup, start/stop, mode switching for UART RX (Channels 1-6).
  CRC8: Compute CRC8 for message validation.
  */
@@ -97,7 +97,6 @@ BOS_Status DMA_MSG_RX_Setup(UART_HandleTypeDef *huart,DMA_HandleTypeDef *hDMA){
 
 	if(HAL_OK != HAL_UARTEx_ReceiveToIdle_DMA(huart,(uint8_t* )&UARTRxBuf[GetPort(huart) - 1],MSG_RX_BUF_SIZE))
 		return Status =BOS_ERROR;
-
 	__HAL_DMA_DISABLE_IT(hDMA,DMA_IT_HT);
 
 	return Status;
@@ -113,7 +112,6 @@ BOS_Status DMA_STREAM_Setup(UART_HandleTypeDef *huartSrc,UART_HandleTypeDef *hua
 	port =GetPort(huartSrc);
 	dstPort =GetPort(huartDst);
 	hDMA =UARTDMAHandler[port - 1];
-
 	/* dstPort = 0 this mean we will receive stream data on RAM memory incoming from a destination module */
 	if(dstPort == 0){
 		/* set DMA index corresponding to UART to zero, so that the DMA starts writing from the beginning of the specific buffer */

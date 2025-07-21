@@ -37,7 +37,7 @@
 #define _P4
 
 /* Define Available USARTs */
-#define _USART1
+//#define _USART1
 #define _USART2
 #define _USART3
 #define _USART5
@@ -115,11 +115,11 @@ extern void MX_USART6_UART_Init(void);
 /***************************************************************************/
 /***************************** General Functions ***************************/
 /***************************************************************************/
-uint8_t MotorTurnOff();
-uint8_t MotorMoveToAngle(float Position, float Duration);
-uint8_t MotorSpeedControl(uint16_t Time, int16_t Speed);
-uint8_t MotorSetTorque(uint16_t Time, int16_t Torque);
-uint8_t MotorGetAngle(float *Position);
+Module_Status MotorTurnOff(void);
+Module_Status MotorMoveToAngle(float Position, float Duration);
+Module_Status MotorSpeedControl(int16_t Speed,uint16_t Time);
+Module_Status MotorSetTorque(int16_t Torque,uint16_t Time) ;
+Module_Status MotorGetAngle(float *Position);
 
 #endif /* H19R0_H */
 

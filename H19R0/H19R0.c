@@ -60,7 +60,7 @@ const CLI_Command_Definition_t CLI_MotorMoveToAngleCommandDefinition = {
 /* CLI command structure : MotorSpeedControl */
 const CLI_Command_Definition_t CLI_MotorSpeedControlCommandDefinition = {
     (const int8_t *)"speed",
-    (const int8_t *)"speed:\r\nSets motor speed and duration.\r\nParameters:\r\n1) Time: ms\r\n2) Speed: int\n\r",
+    (const int8_t *)"speed:\r\nSets motor speed and duration.\r\nParameters:\r\n1) Speed: int \r\n2) Time: ms\n\r",
     CLI_MotorSpeedControlCommand, /* The function to run. */
     2 /* Two parameters are expected. */
 };
@@ -69,7 +69,7 @@ const CLI_Command_Definition_t CLI_MotorSpeedControlCommandDefinition = {
 /* CLI command structure : MotorSetTorque */
 const CLI_Command_Definition_t CLI_MotorSetTorqueCommandDefinition = {
     (const int8_t *)"torque",
-    (const int8_t *)"torque:\r\nSets motor torque and duration.\r\nParameters:\r\n1) Time: ms\r\n2) Torque: int\n\r",
+    (const int8_t *)"torque:\r\nSets motor torque and duration.\r\nParameters:\r\n1) Torque: int\r\n2) Time: ms\n\r",
     CLI_MotorSetTorqueCommand, /* The function to run. */
     2 /* Two parameters are expected. */
 };
@@ -442,7 +442,7 @@ void SetupPortForRemoteBootloaderUpdate(uint8_t port) {
 /* H19R0 module initialization */
 void Module_Peripheral_Init(void) {
     /* Initialize UART ports */
-	UARTInitSTSPIN();
+//	UARTInitSTSPIN();
     MX_USART2_UART_Init();
     MX_USART3_UART_Init();
     MX_USART5_UART_Init();
@@ -522,9 +522,9 @@ Module_Status Module_MessagingTask(uint16_t code, uint8_t port, uint8_t src, uin
 
         case CODE_H19R0_SET_SPEED:
         case CODE_H19R0_SET_TORQUE:
-            time = ((int16_t)cMessage[port - 1][shift]) + ((int16_t)cMessage[port - 1][1 + shift] << 8);
-            value = ((int16_t)cMessage[port - 1][2 + shift]) + ((int16_t)cMessage[port - 1][3 + shift] << 8);
-            result = (code == CODE_H19R0_SET_SPEED) ? MotorSpeedControl(time, value) : MotorSetTorque(time, value);
+            value = ((int16_t)cMessage[port - 1][shift]) + ((int16_t)cMessage[port - 1][1 + shift] << 8);
+            time = ((int16_t)cMessage[port - 1][2 + shift]) + ((int16_t)cMessage[port - 1][3 + shift] << 8);
+            result = (code == CODE_H19R0_SET_SPEED) ? MotorSpeedControl(value,time ) : MotorSetTorque(value,time);
             break;
 
         default:
@@ -571,36 +571,41 @@ Module_Status MotorTurnOff(void) {
 
 /***************************************************************************/
 /**
- * @brief Moves the motor to a target position over a specified duration.
- * @param Position Target angle in degrees (float).
- * @param Duration Time to reach the position in seconds (float).
- * @retval Module_Status H19R0_OK on success.
+ * @brief Programs a position command for the motor to move to a target angle.
+ * The movement to @p Position occurs over @p Duration; if Duration is 0, it executes immediately (follow mode).
+ * @param Position Target angle in radians for the motor's final position (1 radian ≈ 57.2958 degrees).
+ *        Expressed as a float value in radians.
+ * @param Duration Duration of the movement in seconds.
+ *        Set to 0 for instantaneous movement (follow mode).
  */
 Module_Status MotorMoveToAngle(float Position, float Duration) {
-    SetPosition(Position , Duration); // Assuming SetPosition() is defined in a motor control library
+    SetPosition(Position, Duration); // Assuming SetPosition() is defined in a motor control library
     return H19R0_OK;
 }
-
 /***************************************************************************/
 /**
- * @brief Sets the motor to a target speed for a specified duration.
- * @param Time Duration in milliseconds (uint16_t).
- * @param Speed Target speed in user-defined units (int16_t).
- * @retval Module_Status H19R0_OK on success.
+ * @brief Programs a speed ramp for the motor to reach a target speed.
+ * The speed changes linearly to @p Speed over @p Time; if Time is 0, it applies instantly.
+ * @param Speed Target rotor speed in tenth of Hertz (1 Hz = 10 units).
+ *        Expressed as a signed 16-bit integer (-750 , 750 ).
+ * @param Time Duration of the speed ramp in milliseconds.
+ *        Set to 0 for instantaneous speed change.
  */
-Module_Status MotorSpeedControl(uint16_t Time, int16_t Speed) {
+Module_Status MotorSpeedControl(int16_t Speed, uint16_t Time) {
     SetSpeed(Time, Speed); // Assuming SetSpeed() is defined in a motor control library
     return H19R0_OK;
 }
 
 /***************************************************************************/
 /**
- * @brief Sets the motor to a target torque for a specified duration.
- * @param Time Duration in milliseconds (uint16_t).
- * @param Torque Target torque in user-defined units (int16_t).
- * @retval Module_Status H19R0_OK on success.
+ * @brief Programs a torque ramp for the motor to reach a target torque.
+ * The torque changes linearly to @p Torque over @p Time; if Time is 0, it applies instantly.
+ * @param Torque Target motor torque in digit (Iq current, 1000 digit ≈ 1 A, assuming library scaling).
+ *        Expressed as a signed 16-bit integer.
+ * @param Time Duration of the torque ramp in milliseconds.
+ *        Set to 0 for instantaneous torque change.
  */
-Module_Status MotorSetTorque(uint16_t Time, int16_t Torque) {
+Module_Status MotorSetTorque(int16_t Torque, uint16_t Time) {
     SetTorque(Time, Torque); // Assuming SetTorque() is defined in a motor control library
     return H19R0_OK;
 }
@@ -665,7 +670,7 @@ portBASE_TYPE CLI_MotorSpeedControlCommand(int8_t *pcWriteBuffer, size_t xWriteB
     portBASE_TYPE len1, len2;
     uint16_t speed = (uint16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &len1));
     int16_t time = (int16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &len2));
-    Module_Status status = MotorSpeedControl(time, speed);
+    Module_Status status = MotorSpeedControl(speed,time );
     sprintf((char *)pcWriteBuffer, (status == H19R0_OK) ? "Speed: %d Time: %dms\n\r" : "Error setting speed.\n\r", speed, time);
     return pdFALSE;
 }
@@ -683,7 +688,7 @@ portBASE_TYPE CLI_MotorSetTorqueCommand(int8_t *pcWriteBuffer, size_t xWriteBuff
     portBASE_TYPE len1, len2;
     uint16_t torque = (uint16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 1, &len1));
     int16_t time = (int16_t)atoi((char *)FreeRTOS_CLIGetParameter(pcCommandString, 2, &len2));
-    Module_Status status = MotorSetTorque(time, torque);
+    Module_Status status = MotorSetTorque(torque,time );
     sprintf((char *)pcWriteBuffer, (status == H19R0_OK) ? "Torque: %d Time: %dms\n\r" : "Error setting torque.\n\r", torque, time);
     return pdFALSE;
 }

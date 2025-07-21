@@ -394,7 +394,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart){
 		hdma_usart5_rx.Init.Mode = DMA_CIRCULAR;
 		hdma_usart5_rx.Init.Priority = DMA_PRIORITY_LOW;
 
-		UARTDMAHandler[UART_DMA_PORT_INDEX_P5] = &hdma_usart5_rx;
+		UARTDMAHandler[UART_DMA_PORT_INDEX_P4] = &hdma_usart5_rx;
 
 		HAL_DMA_Init(&hdma_usart5_rx);
 		__HAL_LINKDMA(huart,hdmarx,hdma_usart5_rx);
@@ -430,7 +430,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart){
 		hdma_usart6_rx.Init.Mode = DMA_CIRCULAR;
 		hdma_usart6_rx.Init.Priority = DMA_PRIORITY_LOW;
 
-		UARTDMAHandler[UART_DMA_PORT_INDEX_P6] = &hdma_usart6_rx;
+		UARTDMAHandler[UART_DMA_PORT_INDEX_P1] = &hdma_usart6_rx;
 
 		HAL_DMA_Init(&hdma_usart6_rx);
 		__HAL_LINKDMA(huart,hdmarx,hdma_usart6_rx);
