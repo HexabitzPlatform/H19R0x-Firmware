@@ -598,9 +598,9 @@ Module_Status MotorSpeedControl(int16_t Speed, uint16_t Time) {
 
 /***************************************************************************/
 /**
- * @brief Programs a torque ramp for the motor to reach a target torque.
- * The torque changes linearly to @p Torque over @p Time; if Time is 0, it applies instantly.
- * @param Torque Target motor torque in digit (Iq current, 1000 digit ≈ 1 A, assuming library scaling).
+ * @brief Applies a braking torque to stop the motor, used only when the motor is in STOP state.
+ * The braking torque is set to Torque instantly if Time is 0, otherwise it ramps over Time.
+ * @param Torque Target braking torque in digit .
  *        Expressed as a signed 16-bit integer.
  * @param Time Duration of the torque ramp in milliseconds.
  *        Set to 0 for instantaneous torque change.
